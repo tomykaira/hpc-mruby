@@ -5,12 +5,12 @@
 #include "mruby/compile.h"
 #include "mruby/dump.h"
 #include "mruby/proc.h"
+#include "mruby/string.h"
 
-#define RITEBIN_EXT ".mrb"
-#define C_EXT       ".c"
+#include "hpcmrb.h"
 
-void mrb_show_version(mrb_state *);
-void mrb_show_copyright(mrb_state *);
+#define C_EXT ".c"
+
 void parser_dump(mrb_state*, struct mrb_ast_node*, int);
 void codedump_all(mrb_state*, int);
 
@@ -18,12 +18,48 @@ struct _args {
   FILE *rfp;
   FILE *wfp;
   char *filename;
-  char *initname;
-  char *ext;
   mrb_bool check_syntax : 1;
   mrb_bool verbose      : 1;
   mrb_bool debug_info   : 1;
 };
+
+/* Ported from src/print.c */
+static void
+printstr(mrb_state *mrb, mrb_value obj)
+{
+#ifdef ENABLE_STDIO
+  struct RString *str;
+  char *s;
+  int len;
+
+  if (mrb_string_p(obj)) {
+    str = mrb_str_ptr(obj);
+    s = str->ptr;
+    len = str->len;
+    fwrite(s, len, 1, stdout);
+  }
+#endif
+}
+
+static void
+show_version(mrb_state *mrb)
+{
+  static const char version_msg[] = "hpcmrb - HPC-Ruby compiler for Embeddable Ruby  Copyright (c) 2013 HPC-Ruby developers\n";
+  mrb_value msg;
+
+  msg = mrb_str_new(mrb, version_msg, sizeof(version_msg) - 1);
+  printstr(mrb, msg);
+}
+
+static void
+show_copyright(mrb_state *mrb)
+{
+  static const char copyright_msg[] = "hpcmrb - Copyright (c) 2013 HPC-Ruby developers\n";
+  mrb_value msg;
+
+  msg = mrb_str_new(mrb, copyright_msg, sizeof(copyright_msg) - 1);
+  printstr(mrb, msg);
+}
 
 static void
 usage(const char *name)
@@ -74,7 +110,6 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
   static const struct _args args_zero = { 0 };
 
   *args = args_zero;
-  args->ext = RITEBIN_EXT;
 
   for (argc--,argv++; argc > 0; argc--,argv++) {
     if (**argv == '-') {
@@ -94,20 +129,11 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
         }
         outfile = get_outfilename(mrb, (*argv) + 2, "");
         break;
-      case 'B':
-        args->ext = C_EXT;
-        args->initname = (*argv) + 2;
-        if (*args->initname == '\0') {
-          printf("%s: Function name is not specified.\n", *origargv);
-          result = EXIT_FAILURE;
-          goto exit;
-        }
-        break;
       case 'c':
         args->check_syntax = 1;
         break;
       case 'v':
-        if(!args->verbose) mrb_show_version(mrb);
+        if(!args->verbose) show_version(mrb);
         args->verbose = 1;
         break;
       case 'g':
@@ -115,7 +141,7 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
         break;
       case '-':
         if (strcmp((*argv) + 2, "version") == 0) {
-          mrb_show_version(mrb);
+          show_version(mrb);
           exit(EXIT_SUCCESS);
         }
         else if (strcmp((*argv) + 2, "verbose") == 0) {
@@ -123,7 +149,7 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
           break;
         }
         else if (strcmp((*argv) + 2, "copyright") == 0) {
-          mrb_show_copyright(mrb);
+          show_copyright(mrb);
           exit(EXIT_SUCCESS);
         }
         result = EXIT_FAILURE;
@@ -151,7 +177,7 @@ parse_args(mrb_state *mrb, int argc, char **argv, struct _args *args)
         outfile = infile;
       }
       else {
-        outfile = get_outfilename(mrb, infile, args->ext);
+        outfile = get_outfilename(mrb, infile, C_EXT);
       }
     }
     if (strcmp("-", outfile) == 0) {
@@ -187,6 +213,7 @@ main(int argc, char **argv)
   struct _args args;
   mrbc_context *c;
   mrb_value result;
+  struct HIR *hir;
 
   puts("Oh, this is just a bytecode compiler.");
   puts("You should implement a FAST HPC compiler.");
@@ -209,8 +236,8 @@ main(int argc, char **argv)
     c->dump_result = 1;
   c->no_exec = 1;
   c->filename = args.filename;
-  result = mrb_load_file_cxt(mrb, args.rfp, c);
-  if (mrb_undef_p(result) || mrb_fixnum(result) < 0) {
+  hir = hpc_compile_file(mrb, args.rfp, c);
+  if (!hir) {
     cleanup(mrb, &args);
     return EXIT_FAILURE;
   }
@@ -219,15 +246,10 @@ main(int argc, char **argv)
     cleanup(mrb, &args);
     return EXIT_SUCCESS;
   }
-  if (args.initname) {
-    n = mrb_dump_irep_cfunc(mrb, n, args.debug_info, args.wfp, args.initname);
-    if (n == MRB_DUMP_INVALID_ARGUMENT) {
-      printf("%s: Invalid C language symbol name\n", args.initname);
-      return EXIT_FAILURE;
-    }
-  }
-  else {
-    n = mrb_dump_irep_binary(mrb, n, args.debug_info, args.wfp);
+  result = hpc_generate_code(mrb, args.wfp, hir, c);
+  if (mrb_undef_p(result) || mrb_fixnum(result) < 0) {
+    cleanup(mrb, &args);
+    return EXIT_FAILURE;
   }
 
   cleanup(mrb, &args);
