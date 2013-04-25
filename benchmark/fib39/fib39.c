@@ -7,4 +7,6 @@ int fib(int n){
 
 int main(){
   printf("%d\n", fib(39));
+
+  return 0;
 }
