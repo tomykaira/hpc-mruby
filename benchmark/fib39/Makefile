@@ -1,4 +1,5 @@
-.PHONY: all c java python ruby ocaml ocamlopt clean
+.PHONY: all c java python ruby ocaml ocamlopt haskell \
+clean
 
 RUBY_TARGETS=1.9.3-p392 2.0.0-p0 jruby-1.7.3 rbx-2.0.0-rc1 topaz-dev
 PYTHON_TARGETS=2.7.4 3.3.1 jython-2.5.3 pypy-1.9
@@ -7,25 +8,29 @@ BENCH=fib39
 MACHINE=`whoami`_`uname -n`
 TIME=../time.sh $(BENCH) $(MACHINE)
 
-all: c java python ruby ocaml ocamlopt
+all: c java python ruby ocaml ocamlopt haskell
 
-c: fib39.c
+c: fib39.c clean
 	gcc -O3 fib39.c -o c.out
 	$(TIME) c ./c.out
 
-java: fib39.java
+java: fib39.java clean
 	javac -g:none fib39.java
 	$(TIME) java java fib39
 
-ocaml: fib39.ml
+ocaml: fib39.ml clean
 	ocamlc fib39.ml -o $@.out
 	$(TIME) $@ ./$@.out
 
-ocamlopt: fib39.ml
+ocamlopt: fib39.ml clean
 	ocamlopt fib39.ml -o $@.out
 	$(TIME) $@ ./$@.out
 
-python: fib39.py
+haskell: fib39.hs clean
+	ghc -O3 $< -o $@.out
+	$(TIME) $@ ./$@.out
+
+python: fib39.py clean
 	for version in $(PYTHON_TARGETS); do \
 	  bin=`PYENV_VERSION=$$version pyenv which python`; \
 	  if [ $$? -eq 0 ]; then \
@@ -33,7 +38,7 @@ python: fib39.py
 	  fi; \
 	done
 
-ruby: fib39.rb
+ruby: fib39.rb clean
 	for version in $(RUBY_TARGETS); do \
 	  bin=`RBENV_VERSION=$$version rbenv which ruby`; \
 	  if [ $$? -eq 0 ]; then \
@@ -42,4 +47,4 @@ ruby: fib39.rb
 	done
 
 clean:
-	rm -rf *.out *.cmi *.cmo *.cmx *.class .rbx
+	rm -rf *.out *.cmi *.cmo *.cmx *.class .rbx *.hi *.o
