@@ -1,4 +1,5 @@
-.PHONY: all c java python ruby ocaml ocamlopt haskell \
+.PHONY: all c java python ruby ocaml ocamlopt haskell groovy js scheme lua \
+luajit scala \
 clean
 
 RUBY_TARGETS=1.9.3-p392 2.0.0-p0 jruby-1.7.3 rbx-2.0.0-rc1 topaz-dev
@@ -8,7 +9,8 @@ BENCH=fib39
 MACHINE=`whoami`_`uname -n`
 TIME=../time.sh $(BENCH) $(MACHINE)
 
-all: c java python ruby ocaml ocamlopt haskell
+all: c java python ruby ocaml ocamlopt haskell groovy js scheme lua luajit scala
+
 
 c: fib39.c clean
 	gcc -O3 fib39.c -o c.out
@@ -29,6 +31,24 @@ ocamlopt: fib39.ml clean
 haskell: fib39.hs clean
 	ghc -O3 $< -o $@.out
 	$(TIME) $@ ./$@.out
+
+groovy: fib39.groovy clean
+	$(TIME) $@ groovy fib39.groovy
+
+js: fib39.js clean
+	$(TIME) $@ node $<
+
+scheme: fib39.scm clean
+	$(TIME) $@ gosh $<
+
+lua: fib39.lua clean
+	$(TIME) $@ lua $<
+
+luajit: fib39.lua clean
+	$(TIME) $@ luajit $<
+
+scala: fib39.scala clean
+	$(TIME) $@ scala $<
 
 python: fib39.py clean
 	for version in $(PYTHON_TARGETS); do \
