@@ -25,7 +25,7 @@ mrb_state*
 mrb_open_allocf(mrb_allocf f, void *ud)
 {
   static const mrb_state mrb_state_zero = { 0 };
-  mrb_state *mrb = (mrb_state *)(f)(NULL, NULL, sizeof(mrb_state), ud);
+  mrb_state *mrb = (mrb_state *)(f)(NULL, NULL, sizeof(mrb_state), ud); /* mrb_stateの初期化 */
   if (mrb == NULL) return NULL;
 
   *mrb = mrb_state_zero;
@@ -33,8 +33,8 @@ mrb_open_allocf(mrb_allocf f, void *ud)
   mrb->allocf = f;
   mrb->current_white_part = MRB_GC_WHITE_A;
 
-  mrb_init_heap(mrb);
-  mrb_init_core(mrb);
+  mrb_init_heap(mrb); /* gc周りの初期化 */
+  mrb_init_core(mrb); /* 組み込みのClass,Object,Methodを定義 */
   return mrb;
 }
 
