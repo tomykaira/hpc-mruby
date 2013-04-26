@@ -9,10 +9,10 @@ TIME=../time.sh $(BENCH) $(MACHINE)
 
 all: c java python ruby
 
-c: ao_c_double.c
-	gcc -Wall -Wextra -Ofast -s -fomit-frame-pointer -msse3 -march=core2 -ffast-math -fwhole-program -ftrapv -mfpmath=sse -std=c99 ao_c_double.c -lm -o c.out
+c: ao-render.c
+	gcc -Wall -Wextra -Ofast -s -fomit-frame-pointer -msse3 -march=core2 -ffast-math -fwhole-program -ftrapv -mfpmath=sse -std=c99 ao-render.c -lm -o c.out
 	$(TIME) c ./c.out
-	rm c.out ao_c_double.ppm
+	rm c.out ao-render-c.ppm
 
 java: AO.java
 	javac -g:none AO.java
