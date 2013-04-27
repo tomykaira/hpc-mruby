@@ -1,4 +1,4 @@
-.PHONY: all c java python ruby
+.PHONY: all c java python ruby groovy
 
 RUBY_TARGETS=1.9.3-p392 2.0.0-p0 jruby-1.7.3 rbx-2.0.0-rc1 topaz-dev
 PYTHON_TARGETS=2.7.4 3.3.1 jython-2.5.3 pypy-1.9
@@ -18,6 +18,9 @@ java: AO.java
 	javac -g:none AO.java
 	$(TIME) java java AO
 	rm *.class ao_java.ppm
+
+groovy: ao.groovy
+	$(TIME) $@ groovy ao.groovy
 
 python: ao_py.py
 	for version in $(PYTHON_TARGETS); do \
