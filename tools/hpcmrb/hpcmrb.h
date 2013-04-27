@@ -9,6 +9,9 @@ extern "C" {
 #include "mruby.h"
 #include "mruby/compile.h"
 
+#define NOT_IMPLEMENTED() mrb_bug("%s(%d): not implemented", __func__, __LINE__)
+#define NOT_REACHABLE()   mrb_bug("%s(%d): not reachable here", __func__, __LINE__)
+
 /* High-level intermediate representation. */
 enum hir_type {
   /* declarations */
