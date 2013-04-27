@@ -1,4 +1,5 @@
-.PHONY: all c java python ruby groovy
+.PHONY: all c java python ruby groovy \
+clean
 
 RUBY_TARGETS=1.9.3-p392 2.0.0-p0 jruby-1.7.3 rbx-2.0.0-rc1 topaz-dev
 PYTHON_TARGETS=2.7.4 3.3.1 jython-2.5.3 pypy-1.9
@@ -39,3 +40,6 @@ ruby: ao-render.rb
 	  fi; \
 	done
 	rm ao_rb.ppm
+
+clean:
+	rm -rf *.out *.cmi *.cmo *.cmx *.class .rbx *.hi *.o
