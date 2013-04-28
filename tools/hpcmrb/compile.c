@@ -88,11 +88,14 @@ lat_inspect(mrb_state *mrb, mrb_value lat)
 }
 
 static int
-ary_include(mrb_state *mrb, mrb_value ary[], int len, mrb_value val)
+ary_include_lat(mrb_state *mrb, mrb_value ary, mrb_value lat)
 {
   int i;
+  int len = RARRAY_LEN(ary);
+  mrb_value *ptr = RARRAY_PTR(ary);
+
   for (i = 0; i < len; i++) {
-    if (LAT_HAS_TYPE(mrb, ary[i], LAT_DYNAMIC) || lat_equal(mrb, ary[i], val))
+    if (LAT_HAS_TYPE(mrb, ptr[i], LAT_DYNAMIC) || lat_equal(mrb, ptr[i], lat))
       return TRUE;
   }
   return FALSE;
@@ -107,10 +110,7 @@ lat_include(mrb_state *mrb, mrb_value lat, mrb_value val)
     return TRUE;
   if (LAT(lat)->type != LAT_SET)
     return FALSE;
-  return ary_include(mrb,
-      RARRAY_PTR(LAT(lat)->elems), 
-      RARRAY_LEN(LAT(lat)->elems),
-      val);
+  return ary_include_lat(mrb, LAT(lat)->elems, val);
 }
 
 static int
@@ -141,7 +141,7 @@ lat_equal(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
         mrb_value *ary2 = RARRAY_PTR(elems2);
         int i, len = RARRAY_LEN(elems1);
         for (i = 0; i < len; i++) {
-          if (!ary_include(mrb, ary2, len, ary1[i]))
+          if (!ary_include_lat(mrb, elems2, ary1[i]))
             return FALSE;
         }
         return TRUE;
@@ -185,7 +185,7 @@ lat_le(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
         int i, len1 = RARRAY_LEN(elems1), len2 = RARRAY_LEN(elems2);
         /* NB: We assume that len is small enough */
         for (i = 0; i < len1; i++) {
-          if (!ary_include(mrb, ary2, len2, ary1[i]))
+          if (!ary_include_lat(mrb, elems2, ary1[i]))
             return FALSE;
         }
         return TRUE;
@@ -239,8 +239,8 @@ lat_set_equal2(mrb_state *mrb, mrb_value lat, mrb_value val1, mrb_value val2)
   mrb_value elems = LAT(lat)->elems;
   if (RARRAY_LEN(elems) != 2)
     return FALSE;
-  return ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val1) &&
-         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val2);
+  return ary_include_lat(mrb, elems, val1) &&
+         ary_include_lat(mrb, elems, val2);
 }
 
 static int
@@ -255,9 +255,9 @@ lat_set_equal3(mrb_state *mrb, mrb_value lat, mrb_value val1, mrb_value val2,
   mrb_value elems = LAT(lat)->elems;
   if (RARRAY_LEN(elems) != 3)
     return FALSE;
-  return ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val1) &&
-         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val2) &&
-         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val3);
+  return ary_include_lat(mrb, elems, val1) &&
+         ary_include_lat(mrb, elems, val2) &&
+         ary_include_lat(mrb, elems, val3);
 }
 
 static int
@@ -272,10 +272,10 @@ lat_set_equal4(mrb_state *mrb, mrb_value lat, mrb_value val1, mrb_value val2,
   mrb_value elems = LAT(lat)->elems;
   if (RARRAY_LEN(elems) != 3)
     return FALSE;
-  return ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val1) &&
-         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val2) &&
-         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val3) &&
-         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val4);
+  return ary_include_lat(mrb, elems, val1) &&
+         ary_include_lat(mrb, elems, val2) &&
+         ary_include_lat(mrb, elems, val3) &&
+         ary_include_lat(mrb, elems, val4);
 }
 
 static mrb_value
