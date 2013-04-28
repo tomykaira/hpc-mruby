@@ -104,13 +104,18 @@ ary_include_lat(mrb_state *mrb, mrb_value ary, mrb_value lat)
 static int
 lat_include(mrb_state *mrb, mrb_value lat, mrb_value val)
 {
-  if (LAT_P(mrb, lat))
-    return mrb_equal(mrb, lat, val);
-  if (LAT(lat)->type == LAT_DYNAMIC)
-    return TRUE;
-  if (LAT(lat)->type != LAT_SET)
-    return FALSE;
-  return ary_include_lat(mrb, LAT(lat)->elems, val);
+  switch (LAT_TYPE(mrb, lat)) {
+    case LAT_UNKNOWN:
+      return FALSE;
+    case LAT_SET:
+      return ary_include_lat(mrb, LAT(lat)->elems, val);
+    case LAT_CONST:
+      return mrb_equal(mrb, lat, val);
+    case LAT_DYNAMIC:
+      return TRUE;
+    default:
+      NOT_REACHABLE();
+  }
 }
 
 static int
