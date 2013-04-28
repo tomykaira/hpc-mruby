@@ -379,15 +379,91 @@ lat_join(mrb_state *mrb, mrb_value val1, mrb_value val2)
   }
 }
 
+/* Type analysis */
+typedef mrb_ast_node node;
+typedef struct mrb_parser_state parser_state;
+
+enum looptype {
+  LOOP_NORMAL,
+  LOOP_BLOCK,
+  LOOP_FOR,
+  LOOP_BEGIN,
+  LOOP_RESCUE,
+} type;
+
+struct loopinfo {
+  enum looptype type;
+  int pc1, pc2, pc3, acc;
+  int ensure_level;
+  struct loopinfo *prev;
+};
+
+typedef struct scope {
+  mrb_state *mrb;
+  mrb_pool *mpool;
+  jmp_buf jmp;
+
+  struct scope *prev;
+
+  node *lv;
+
+  int sp;
+  int pc;
+  int lastlabel;
+  int ainfo:15;
+  mrb_bool mscope:1;
+
+  struct loopinfo *loop;
+  int ensure_level;
+  char *filename;
+  short lineno;
+
+  HIR *hir;
+
+  int nlocals;
+  int nregs;
+  int ai;
+
+  int idx;
+} hpc_scope;
+
+static HIR*
+compile(mrb_state *mrb, parser_state *p)
+{
+  return 0;
+}
+
 HIR*
 hpc_compile_file(mrb_state *mrb, FILE *rfp, mrbc_context *c)
 {
+  parser_state *p = mrb_parse_file(mrb, rfp, c);
+
+  if (!p) return 0;
+  if (!p->tree || p->nerr) {
+    if (p->capture_errors) {
+      char buf[256];
+
+      int n = snprintf(buf, sizeof(buf), "line %d: %s\n",
+      p->error_buffer[0].lineno, p->error_buffer[0].message);
+      mrb->exc = mrb_obj_ptr(mrb_exc_new(mrb, E_SYNTAX_ERROR, buf, n));
+      mrb_parser_free(p);
+      return 0;
+    }
+    else {
+      static const char msg[] = "syntax error";
+      mrb->exc = mrb_obj_ptr(mrb_exc_new(mrb, E_SYNTAX_ERROR, msg, sizeof(msg) - 1));
+      mrb_parser_free(p);
+      return 0;
+    }
+  }
+  compile(mrb, p);
+
   puts("hpc_compile_file: NOT IMPLEMENTED YET");
   return (HIR*) 1; /* stub */
 }
 
 void
-hpcmrb_init(mrb_state *mrb)
+init_hpc_compiler(mrb_state *mrb)
 {
   lat_class = mrb_define_class(mrb, "Lattice", mrb->object_class);
   lat_unknown = lat_new(mrb, LAT_UNKNOWN);

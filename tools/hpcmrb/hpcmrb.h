@@ -69,6 +69,7 @@ typedef struct HIR {
   short lineno;
 } HIR;
 
+void init_hpc_compiler(mrb_state *mrb);
 HIR *hpc_compile_file(mrb_state*, FILE*, mrbc_context*);
 mrb_value hpc_generate_code(mrb_state*, FILE*, HIR*, mrbc_context*);
 

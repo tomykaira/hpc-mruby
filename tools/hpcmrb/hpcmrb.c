@@ -236,7 +236,10 @@ main(int argc, char **argv)
     c->dump_result = 1;
   c->no_exec = 1;
   c->filename = args.filename;
+
+  init_hpc_compiler(mrb);
   hir = hpc_compile_file(mrb, args.rfp, c);
+
   if (!hir) {
     cleanup(mrb, &args);
     return EXIT_FAILURE;
