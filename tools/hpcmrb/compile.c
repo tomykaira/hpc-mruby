@@ -406,9 +406,8 @@ typedef struct scope {
   struct scope *prev;
 
   node *lv;
-
   int sp;
-  int pc;
+
   int lastlabel;
   int ainfo:15;
   mrb_bool mscope:1;
@@ -421,15 +420,71 @@ typedef struct scope {
   HIR *hir;
 
   int nlocals;
-  int nregs;
-  int ai;
 
-  int idx;
+  int ai;
 } hpc_scope;
+
+static int
+node_len(node *tree)
+{
+  int n = 0;
+
+  while (tree) {
+    n++;
+    tree = tree->cdr;
+  }
+  return n;
+}
+
+static void
+hpc_error(hpc_scope *s, const char *message)
+{
+  if (!s) return;
+  while (s->prev) {
+    mrb_pool_close(s->mpool);
+    s = s->prev;
+  }
+  mrb_pool_close(s->mpool);
+#ifdef ENABLE_STDIO
+  if (s->filename && s->lineno) {
+    fprintf(stderr, "hpcmrb error:%s:%d: %s\n", s->filename, s->lineno, message);
+  }
+  else {
+    fprintf(stderr, "hpcmrb error: %s\n", message);
+  }
+#endif
+  longjmp(s->jmp, 1);
+}
+
+static hpc_scope*
+scope_new(mrb_state *mrb, hpc_scope *prev, node *lv)
+{
+  static const hpc_scope hpc_scope_zero = { 0 };
+  mrb_pool *pool = mrb_pool_open(mrb);
+  hpc_scope *p = (hpc_scope *)mrb_pool_alloc(pool, sizeof(hpc_scope));
+
+  if (!p) hpc_error(p, "mrb_pool_alloc failed");
+  *p = hpc_scope_zero;
+  p->mrb = mrb;
+  p->mpool = pool;
+  if (!prev) return p;
+  p->prev = prev;
+  p->ainfo = -1;
+  p->mscope = 0;
+  p->lv = lv;
+  p->sp += node_len(lv) + 1;  /* +1 for self */
+  p->nlocals = p->sp;
+  p->ai = mrb_gc_arena_save(mrb);
+
+  p->filename = prev->filename;
+  p->lineno = prev->lineno;
+  return p;
+}
 
 static HIR*
 compile(mrb_state *mrb, parser_state *p)
 {
+  puts("compile: NOT IMPLEMENTED YET");
   return 0;
 }
 
@@ -456,10 +511,7 @@ hpc_compile_file(mrb_state *mrb, FILE *rfp, mrbc_context *c)
       return 0;
     }
   }
-  compile(mrb, p);
-
-  puts("hpc_compile_file: NOT IMPLEMENTED YET");
-  return (HIR*) 1; /* stub */
+  return compile(mrb, p);
 }
 
 void
