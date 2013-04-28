@@ -113,6 +113,172 @@ lat_equal(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
   }
 }
 
+/* Returns true if lat1 <= lat2 in the lattice of types */
+static int
+lat_le(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
+{
+  if (LAT(lat1)->type == LAT_UNKNOWN)
+    return TRUE;
+  if (LAT(lat2)->type == LAT_DYNAMIC)
+    return TRUE;
+  if (!LAT_P(mrb, lat2)) {
+    if (LAT_P(mrb, lat1))
+      return FALSE;
+    return mrb_equal(mrb, lat1, lat2);
+  }
+  if (!LAT_P(mrb, lat1))
+    return lat_include(mrb, lat2, lat1);
+
+  /* here, lat1 and lat2 are lattices */
+  if (LAT(lat1)->type != LAT(lat2)->type)
+    return FALSE;
+
+  /* here, lat1 and lat2 are not unknown and dynamic */
+  /* TODO: check instance variables */
+  switch (LAT(lat1)->type) {
+    case LAT_SET:
+      {
+        mrb_value elems1 = LAT(lat1)->elems;
+        mrb_value elems2 = LAT(lat2)->elems;
+        if (RARRAY_LEN(elems1) > RARRAY_LEN(elems2))
+          return FALSE;
+        mrb_value *ary1 = RARRAY_PTR(elems1);
+        mrb_value *ary2 = RARRAY_PTR(elems2);
+        int i, len1 = RARRAY_LEN(elems1), len2 = RARRAY_LEN(elems2);
+        /* NB: We assume that len is small enough */
+        for (i = 0; i < len1; i++) {
+          if (!ary_include(mrb, ary2, len2, ary1[i]))
+            return FALSE;
+        }
+        return TRUE;
+      }
+    default:
+      NOT_REACHABLE();
+  }
+}
+
+/* utilities */
+
+static int
+lat_set_add(mrb_state *mrb, mrb_value lat, mrb_value val)
+{
+  if (!LAT_P(mrb, lat) || LAT(lat)->type != LAT_SET)
+    NOT_REACHABLE();
+  if (LAT_P(mrb, val) && LAT(val)->type == LAT_SET)
+    NOT_REACHABLE();
+  if (!LAT_P(mrb, val))
+    val = mrb_obj_value(mrb_obj_class(mrb, val));
+  if (lat_include(mrb, lat, val))
+    return FALSE;
+
+  mrb_ary_push(mrb, LAT(lat)->elems, val);
+  return TRUE;
+}
+
+/* check lat == {val} */
+static int
+lat_set_equal1(mrb_state *mrb, mrb_value lat, mrb_value val)
+{
+  if (!LAT_P(mrb, lat))
+    return mrb_equal(mrb, lat, val);
+  if (LAT(lat)->type != LAT_SET)
+    return FALSE;
+
+  mrb_value elems = LAT(lat)->elems;
+  if (RARRAY_LEN(elems) != 1)
+    return FALSE;
+  return lat_equal(mrb, RARRAY_PTR(elems)[0], val);
+}
+
+static int
+lat_set_equal2(mrb_state *mrb, mrb_value lat, mrb_value val1, mrb_value val2)
+{
+  if (!LAT_P(mrb, lat))
+    return FALSE;
+  if (LAT(lat)->type != LAT_SET)
+    return FALSE;
+
+  mrb_value elems = LAT(lat)->elems;
+  if (RARRAY_LEN(elems) != 2)
+    return FALSE;
+  return ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val1) &&
+         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val2);
+}
+
+static int
+lat_set_equal3(mrb_state *mrb, mrb_value lat, mrb_value val1, mrb_value val2,
+               mrb_value val3)
+{
+  if (!LAT_P(mrb, lat))
+    return FALSE;
+  if (LAT(lat)->type != LAT_SET)
+    return FALSE;
+
+  mrb_value elems = LAT(lat)->elems;
+  if (RARRAY_LEN(elems) != 3)
+    return FALSE;
+  return ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val1) &&
+         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val2) &&
+         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val3);
+}
+
+static int
+lat_set_equal4(mrb_state *mrb, mrb_value lat, mrb_value val1, mrb_value val2,
+               mrb_value val3, mrb_value val4)
+{
+  if (!LAT_P(mrb, lat))
+    return FALSE;
+  if (LAT(lat)->type != LAT_SET)
+    return FALSE;
+
+  mrb_value elems = LAT(lat)->elems;
+  if (RARRAY_LEN(elems) != 3)
+    return FALSE;
+  return ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val1) &&
+         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val2) &&
+         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val3) &&
+         ary_include(mrb, RARRAY_PTR(elems), RARRAY_LEN(elems), val4);
+}
+
+static mrb_value
+lat_set_new1(mrb_state *mrb, mrb_value val)
+{
+  mrb_value lat = lat_new(mrb, LAT_SET);
+  lat_set_add(mrb, lat, val);
+  return lat;
+}
+
+static mrb_value
+lat_set_new2(mrb_state *mrb, mrb_value val1, mrb_value val2)
+{
+  mrb_value lat = lat_new(mrb, LAT_SET);
+  lat_set_add(mrb, lat, val1);
+  lat_set_add(mrb, lat, val2);
+  return lat;
+}
+
+static mrb_value
+lat_set_new3(mrb_state *mrb, mrb_value val1, mrb_value val2, mrb_value val3)
+{
+  mrb_value lat = lat_new(mrb, LAT_SET);
+  lat_set_add(mrb, lat, val1);
+  lat_set_add(mrb, lat, val2);
+  lat_set_add(mrb, lat, val3);
+  return lat;
+}
+
+static mrb_value
+lat_set_new4(mrb_state *mrb, mrb_value val1, mrb_value val2, mrb_value val3,
+             mrb_value val4)
+{
+  mrb_value lat = lat_new(mrb, LAT_SET);
+  lat_set_add(mrb, lat, val1);
+  lat_set_add(mrb, lat, val2);
+  lat_set_add(mrb, lat, val3);
+  lat_set_add(mrb, lat, val4);
+  return lat;
+}
+
 HIR*
 hpc_compile_file(mrb_state *mrb, FILE *rfp, mrbc_context *c)
 {
