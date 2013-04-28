@@ -26,7 +26,7 @@ struct lattice {
 
 static struct RClass *lat_class;
 #define LAT_P(mrb, obj) (mrb_obj_class(mrb, obj) == lat_class)
-#define LAT_CHECK_TYPE(mrb, obj, ty) (LAT_P(mrb, obj) && LAT(obj)->type == ty)
+#define LAT_HAS_TYPE(mrb, obj, ty) (LAT_P(mrb, obj) && LAT(obj)->type == ty)
 
 #define LAT_TYPE(mrb, obj)  (LAT_P(mrb, obj) ? LAT(obj)->type : LAT_CONST)
 
@@ -92,7 +92,7 @@ ary_include(mrb_state *mrb, mrb_value ary[], int len, mrb_value val)
 {
   int i;
   for (i = 0; i < len; i++) {
-    if (LAT_CHECK_TYPE(mrb, ary[i], LAT_DYNAMIC) || lat_equal(mrb, ary[i], val))
+    if (LAT_HAS_TYPE(mrb, ary[i], LAT_DYNAMIC) || lat_equal(mrb, ary[i], val))
       return TRUE;
   }
   return FALSE;
