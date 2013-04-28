@@ -360,18 +360,14 @@ lat_join(mrb_state *mrb, mrb_value val1, mrb_value val2)
           NOT_REACHABLE();
       }
     case LAT_SET:
-      switch (LAT_TYPE(mrb, val2)) {
-        case LAT_SET:
-          {
-            val1 = lat_clone(mrb, val1);
-            mrb_value *ary = RARRAY_PTR(LAT(val2)->elems);
-            int i, n = RARRAY_LEN(LAT(val2)->elems);
-            for (i = 0; i < n; i++)
-              lat_set_add(mrb, val1, ary[i]);
-            return val1;
-          }
-        default:
-          NOT_REACHABLE();
+      hpc_assert(LAT_HAS_TYPE(mrb, val2, LAT_SET));
+      {
+        mrb_value *ary = RARRAY_PTR(LAT(val2)->elems);
+        int i, len = RARRAY_LEN(LAT(val2)->elems);
+        val1 = lat_clone(mrb, val1);
+        for (i = 0; i < len; i++)
+          lat_set_add(mrb, val1, ary[i]);
+        return val1;
       }
     default:
       NOT_REACHABLE();
