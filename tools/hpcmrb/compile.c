@@ -234,9 +234,7 @@ lat_set_equal1(mrb_state *mrb, mrb_value lat, mrb_value val)
 static int
 lat_set_equal2(mrb_state *mrb, mrb_value lat, mrb_value val1, mrb_value val2)
 {
-  if (!LAT_P(mrb, lat))
-    return FALSE;
-  if (LAT(lat)->type != LAT_SET)
+  if (!LAT_HAS_TYPE(mrb, lat, LAT_SET))
     return FALSE;
 
   mrb_value elems = LAT(lat)->elems;
@@ -250,9 +248,7 @@ static int
 lat_set_equal3(mrb_state *mrb, mrb_value lat, mrb_value val1, mrb_value val2,
                mrb_value val3)
 {
-  if (!LAT_P(mrb, lat))
-    return FALSE;
-  if (LAT(lat)->type != LAT_SET)
+  if (!LAT_HAS_TYPE(mrb, lat, LAT_SET))
     return FALSE;
 
   mrb_value elems = LAT(lat)->elems;
@@ -267,13 +263,11 @@ static int
 lat_set_equal4(mrb_state *mrb, mrb_value lat, mrb_value val1, mrb_value val2,
                mrb_value val3, mrb_value val4)
 {
-  if (!LAT_P(mrb, lat))
-    return FALSE;
-  if (LAT(lat)->type != LAT_SET)
+  if (!LAT_HAS_TYPE(mrb, lat, LAT_SET))
     return FALSE;
 
   mrb_value elems = LAT(lat)->elems;
-  if (RARRAY_LEN(elems) != 3)
+  if (RARRAY_LEN(elems) != 4)
     return FALSE;
   return ary_include_lat(mrb, elems, val1) &&
          ary_include_lat(mrb, elems, val2) &&
