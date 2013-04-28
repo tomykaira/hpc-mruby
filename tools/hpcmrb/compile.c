@@ -131,27 +131,22 @@ lat_equal(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
   if (LAT(lat1)->type != LAT(lat2)->type)
     return FALSE;
 
+  hpc_assert(LAT_HAS_TYPE(mrb, lat1, LAT_SET));
+  hpc_assert(LAT_HAS_TYPE(mrb, lat2, LAT_SET));
+
   /* TODO: check instance variables */
-  switch (LAT(lat1)->type) {
-    case LAT_UNKNOWN:
-    case LAT_DYNAMIC:
+  {
+    mrb_value elems1 = LAT(lat1)->elems;
+    mrb_value elems2 = LAT(lat2)->elems;
+    if (RARRAY_LEN(elems1) != RARRAY_LEN(elems2))
       return FALSE;
-    case LAT_SET:
-      {
-        mrb_value elems1 = LAT(lat1)->elems;
-        mrb_value elems2 = LAT(lat2)->elems;
-        if (RARRAY_LEN(elems1) != RARRAY_LEN(elems2))
-          return FALSE;
-        mrb_value *ary1 = RARRAY_PTR(elems1);
-        int i, len = RARRAY_LEN(elems1);
-        for (i = 0; i < len; i++) {
-          if (!ary_include_lat(mrb, elems2, ary1[i]))
-            return FALSE;
-        }
-        return TRUE;
-      }
-    default:
-      NOT_REACHABLE();
+    mrb_value *ary1 = RARRAY_PTR(elems1);
+    int i, len = RARRAY_LEN(elems1);
+    for (i = 0; i < len; i++) {
+      if (!ary_include_lat(mrb, elems2, ary1[i]))
+        return FALSE;
+    }
+    return TRUE;
   }
 }
 
