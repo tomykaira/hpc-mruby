@@ -3,9 +3,11 @@
 #include "mruby/data.h"
 
 /* Lattice for abstract intepreration */
-enum lat_type {
+
+enum lat_type { /* Do no change this ordering */
   LAT_UNKNOWN,
   LAT_DYNAMIC,
+  LAT_CONST,    /* used for lat_join */
   LAT_SET,
 };
 
@@ -23,6 +25,11 @@ struct lattice {
 static struct RClass *lat_class;
 #define LAT_P(mrb, obj) (mrb_obj_class(mrb, obj) == lat_class)
 #define LAT_CHECK_TYPE(mrb, obj, ty) (LAT_P(mrb, obj) && LAT(obj)->type == ty)
+
+#define LAT_TYPE(mrb, obj)  (LAT_P(mrb, obj) ? LAT(obj)->type : LAT_CONST)
+
+static mrb_value lat_unknown;
+static mrb_value lat_dynamic;
 
 static int lat_equal(mrb_state*, mrb_value, mrb_value);
 
@@ -279,6 +286,70 @@ lat_set_new4(mrb_state *mrb, mrb_value val1, mrb_value val2, mrb_value val3,
   return lat;
 }
 
+static mrb_value
+lat_clone(mrb_state *mrb, mrb_value lat)
+{
+  switch (LAT_TYPE(mrb, lat)) {
+    case LAT_UNKNOWN:
+    case LAT_DYNAMIC:
+    case LAT_CONST:
+      return lat;
+    case LAT_SET:
+      {
+        mrb_value new_lat = lat_new(mrb, LAT_SET);
+        LAT(new_lat)->elems = mrb_obj_clone(mrb, LAT(lat)->elems);
+        return new_lat;
+      }
+    default:
+      NOT_REACHABLE();
+  }
+}
+
+static mrb_value
+lat_join(mrb_state *mrb, mrb_value val1, mrb_value val2)
+{
+  /* TODO: treat instance variables */
+  if (mrb_eql(mrb, val1, val2))
+    return val1;
+  if (LAT_TYPE(mrb, val1) > LAT_TYPE(mrb, val2))
+    return lat_join(mrb, val2, val1);
+  switch (LAT_TYPE(mrb, val1)) {
+    case LAT_UNKNOWN:
+      return val2;
+    case LAT_DYNAMIC:
+      return lat_dynamic;
+    case LAT_CONST:
+      switch (LAT_TYPE(mrb, val2)) {
+        case LAT_CONST:
+          return lat_set_new2(mrb, val1, val2);
+        case LAT_SET:
+          {
+            val2 = lat_clone(mrb, val2);
+            lat_set_add(mrb, val2, val1);
+            return val2;
+          }
+        default:
+          NOT_REACHABLE();
+      }
+    case LAT_SET:
+      switch (LAT_TYPE(mrb, val2)) {
+        case LAT_SET:
+          {
+            val1 = lat_clone(mrb, val1);
+            mrb_value *ary = RARRAY_PTR(LAT(val2)->elems);
+            int i, n = RARRAY_LEN(LAT(val2)->elems);
+            for (i = 0; i < n; i++)
+              lat_set_add(mrb, val1, ary[i]);
+            return val1;
+          }
+        default:
+          NOT_REACHABLE();
+      }
+    default:
+      NOT_REACHABLE();
+  }
+}
+
 HIR*
 hpc_compile_file(mrb_state *mrb, FILE *rfp, mrbc_context *c)
 {
@@ -290,4 +361,6 @@ void
 hpcmrb_init(mrb_state *mrb)
 {
   lat_class = mrb_define_class(mrb, "Lattice", mrb->object_class);
+  lat_unknown = lat_new(mrb, LAT_UNKNOWN);
+  lat_dynamic = lat_new(mrb, LAT_DYNAMIC);
 }
