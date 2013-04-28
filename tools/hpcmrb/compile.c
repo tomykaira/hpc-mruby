@@ -205,10 +205,8 @@ lat_le(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
 static int
 lat_set_add(mrb_state *mrb, mrb_value lat, mrb_value val)
 {
-  if (!LAT_HAS_TYPE(mrb, lat, LAT_SET))
-    NOT_REACHABLE();
-  if (LAT_HAS_TYPE(mrb, val, LAT_SET))
-    NOT_REACHABLE();
+  hpc_assert(LAT_HAS_TYPE(mrb, lat, LAT_SET));
+  hpc_assert(!LAT_HAS_TYPE(mrb, val, LAT_SET));
   if (!LAT_P(mrb, val))
     val = mrb_obj_value(mrb_obj_class(mrb, val));
   if (lat_include(mrb, lat, val))

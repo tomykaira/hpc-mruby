@@ -11,6 +11,7 @@ extern "C" {
 
 #define NOT_IMPLEMENTED() mrb_bug("%s(%d): not implemented", __func__, __LINE__)
 #define NOT_REACHABLE()   mrb_bug("%s(%d): not reachable here", __func__, __LINE__)
+#define hpc_assert(cond)  do { if (!(cond)) { NOT_REACHABLE(); } } while(0)
 
 /* High-level intermediate representation. */
 enum hir_type {
