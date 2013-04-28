@@ -143,7 +143,6 @@ lat_equal(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
         if (RARRAY_LEN(elems1) != RARRAY_LEN(elems2))
           return FALSE;
         mrb_value *ary1 = RARRAY_PTR(elems1);
-        mrb_value *ary2 = RARRAY_PTR(elems2);
         int i, len = RARRAY_LEN(elems1);
         for (i = 0; i < len; i++) {
           if (!ary_include_lat(mrb, elems2, ary1[i]))
@@ -183,11 +182,11 @@ lat_le(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
       {
         mrb_value elems1 = LAT(lat1)->elems;
         mrb_value elems2 = LAT(lat2)->elems;
+        /* elems2 contains LAT_DYNAMIC */
         if (RARRAY_LEN(elems1) > RARRAY_LEN(elems2))
           return FALSE;
         mrb_value *ary1 = RARRAY_PTR(elems1);
-        mrb_value *ary2 = RARRAY_PTR(elems2);
-        int i, len1 = RARRAY_LEN(elems1), len2 = RARRAY_LEN(elems2);
+        int i, len1 = RARRAY_LEN(elems1);
         /* NB: We assume that len is small enough */
         for (i = 0; i < len1; i++) {
           if (!ary_include_lat(mrb, elems2, ary1[i]))
