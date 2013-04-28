@@ -8,7 +8,8 @@
 enum lat_type { /* Do no change this ordering */
   LAT_UNKNOWN,
   LAT_DYNAMIC,
-  LAT_CONST,    /* used for lat_join */
+  LAT_CONST,    /* any non-LAT object is classified as LAT_CONST
+                   used for lat_join */
   LAT_SET,
 };
 
@@ -78,6 +79,7 @@ lat_inspect(mrb_state *mrb, mrb_value lat)
         }
         return mrb_str_buf_cat(mrb, buf, "}", 1);
       }
+    /* LAT_CONST is not of Lattice class */
     default:
       break;
   }
