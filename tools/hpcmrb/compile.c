@@ -160,9 +160,9 @@ lat_equal(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
 static int
 lat_le(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
 {
-  if (LAT(lat1)->type == LAT_UNKNOWN)
+  if (LAT_HAS_TYPE(mrb, lat1, LAT_UNKNOWN))
     return TRUE;
-  if (LAT(lat2)->type == LAT_DYNAMIC)
+  if (LAT_HAS_TYPE(mrb, lat2, LAT_DYNAMIC))
     return TRUE;
   if (!LAT_P(mrb, lat2)) {
     if (LAT_P(mrb, lat1))
@@ -205,9 +205,9 @@ lat_le(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
 static int
 lat_set_add(mrb_state *mrb, mrb_value lat, mrb_value val)
 {
-  if (!LAT_P(mrb, lat) || LAT(lat)->type != LAT_SET)
+  if (!LAT_HAS_TYPE(mrb, lat, LAT_SET))
     NOT_REACHABLE();
-  if (LAT_P(mrb, val) && LAT(val)->type == LAT_SET)
+  if (LAT_HAS_TYPE(mrb, val, LAT_SET))
     NOT_REACHABLE();
   if (!LAT_P(mrb, val))
     val = mrb_obj_value(mrb_obj_class(mrb, val));
