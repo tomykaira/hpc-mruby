@@ -1,6 +1,7 @@
 #include "hpcmrb.h"
 #include "mruby/array.h"
 #include "mruby/data.h"
+#include "mruby/string.h"
 
 /* Lattice for abstract intepreration */
 
@@ -54,6 +55,34 @@ lat_new(mrb_state *mrb, enum lat_type type)
   if (type == LAT_SET)
     lat->elems = mrb_ary_new(mrb);
   return mrb_obj_value(data);
+}
+
+static mrb_value
+lat_inspect(mrb_state *mrb, mrb_value lat)
+{
+  switch (LAT_TYPE(mrb, lat)) {
+    case LAT_UNKNOWN:
+      return mrb_str_new(mrb, "<unknown>", 9);
+    case LAT_DYNAMIC:
+      return mrb_str_new(mrb, "<dynamic>", 9);
+    case LAT_SET:
+      {
+        mrb_value buf = mrb_str_buf_new(mrb, 10);
+        mrb_value *ary = RARRAY_PTR(LAT(lat)->elems);
+        int i, n = RARRAY_LEN(LAT(lat)->elems);
+        mrb_str_buf_cat(mrb, buf, "{", 1);
+        for (i = 0; i < n; i++) {
+          mrb_str_buf_append(mrb, buf, mrb_inspect(mrb, ary[i]));
+          if (i != n-1)
+            mrb_str_buf_cat(mrb, buf, ", ", 2);
+        }
+        return mrb_str_buf_cat(mrb, buf, "}", 1);
+      }
+    default:
+      break;
+  }
+  NOT_REACHABLE();
+  return mrb_nil_value(); /* to avoid warning */
 }
 
 static int
@@ -363,4 +392,5 @@ hpcmrb_init(mrb_state *mrb)
   lat_class = mrb_define_class(mrb, "Lattice", mrb->object_class);
   lat_unknown = lat_new(mrb, LAT_UNKNOWN);
   lat_dynamic = lat_new(mrb, LAT_DYNAMIC);
+  mrb_define_method(mrb, lat_class, "inspect", lat_inspect, ARGS_NONE());
 }
