@@ -42,7 +42,7 @@ lat_free(mrb_state *mrb, void *p)
 }
 
 static const struct mrb_data_type lat_data_type = {
-  "hpcmrb_lattice", lat_free 
+  "hpcmrb_lattice", lat_free
 };
 
 static mrb_value
