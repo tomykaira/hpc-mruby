@@ -70,7 +70,7 @@ put_type(hpc_codegen_context *c, HIR *kind)
       NOT_REACHABLE();
       return;
     default:
-      NOT_IMPLEMENTED();
+      NOT_REACHABLE();
   }
 }
 
@@ -92,7 +92,6 @@ put_variable(hpc_codegen_context *c, HIR *hir)
 
   switch (k) {
   case HTYPE_ARRAY:
-    /* TODO: array in array */
     {
       int indices[1024];
       int length, i;
