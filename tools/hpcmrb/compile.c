@@ -478,13 +478,17 @@ scope_new(mrb_state *mrb, hpc_scope *prev, node *lv)
 static HIR*
 compile(mrb_state *mrb, parser_state *p)
 {
+  hpc_scope *scope = scope_new(mrb, 0, 0);
+
+  mrb_pool_close(scope->mpool);
   puts("compile: NOT IMPLEMENTED YET");
-  return 0;
+  return (HIR*)1;
 }
 
 HIR*
 hpc_compile_file(mrb_state *mrb, FILE *rfp, mrbc_context *c)
 {
+  puts("Compiling...");
   parser_state *p = mrb_parse_file(mrb, rfp, c);
 
   if (!p) return 0;

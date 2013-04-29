@@ -255,6 +255,8 @@ main(int argc, char **argv)
     return EXIT_FAILURE;
   }
 
+  puts("Done");
+
   cleanup(mrb, &args);
   return EXIT_SUCCESS;
 }
