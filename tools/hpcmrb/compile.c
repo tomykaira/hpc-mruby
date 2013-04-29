@@ -95,7 +95,7 @@ ary_include_lat(mrb_state *mrb, mrb_value ary, mrb_value lat)
   mrb_value *ptr = RARRAY_PTR(ary);
 
   for (i = 0; i < len; i++) {
-    if (LAT_HAS_TYPE(mrb, ptr[i], LAT_DYNAMIC) || lat_equal(mrb, ptr[i], lat))
+    if (lat_equal(mrb, ptr[i], lat))
       return TRUE;
   }
   return FALSE;
