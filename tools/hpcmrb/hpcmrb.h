@@ -48,17 +48,18 @@ enum hir_type {
 };
 
 enum hir_type_kind {
-  HTYPE_VALUE, /* corresponds to mrb_value */
-  HTYPE_SYM,   /* corresponds to mrb_sym */
+  HTYPE_VOID,     /* (:HTYPE_VOID) */
+  HTYPE_VALUE,    /* (:HTYPE_VALUE) */ /* corresponds to mrb_value */
+  HTYPE_SYM,      /* (:HTYPE_SYM) */   /* corresponds to mrb_sym */
 
-  HTYPE_CHAR,
-  HTYPE_INT,
-  HTYPE_FLOAT, /* NB: Its precision depends on MRB_USE_FLOAT */
-  HTYPE_STRING,
+  HTYPE_CHAR,     /* (:HTYPE_CHAR) */
+  HTYPE_INT,      /* (:HTYPE_INT) */
+  HTYPE_FLOAT,    /* (:HTYPE_FLOAT) */ /* NB: Its precision depends on MRB_USE_FLOAT */
+  HTYPE_STRING,   /* (:HTYPE_STRING) */
 
-  HTYPE_PTR,
-  HTYPE_ARRAY,
-  HTYPE_FUNC,
+  HTYPE_PTR,      /* (:HTYPE_PTR basetype) */
+  HTYPE_ARRAY,    /* (:HTYPE_ARRAY basetype len) */
+  HTYPE_FUNC,     /* (:HTYPE_FUNC ret params) */ /* params is list of HIR_LVAR */
 };
 
 enum hir_var_kind {
