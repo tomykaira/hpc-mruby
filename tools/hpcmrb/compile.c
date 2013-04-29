@@ -527,18 +527,6 @@ static HIR *int_type;
 static HIR *float_type;
 static HIR *string_type;
 
-static void
-init_types(hpc_state *p)
-{
-  void_type   = new_simple_type(p, HTYPE_VOID);
-  value_type  = new_simple_type(p, HTYPE_VALUE);
-  sym_type    = new_simple_type(p, HTYPE_SYM);
-  char_type   = new_simple_type(p, HTYPE_CHAR);
-  int_type    = new_simple_type(p, HTYPE_INT);
-  float_type  = new_simple_type(p, HTYPE_FLOAT);
-  string_type = new_simple_type(p, HTYPE_STRING);
-}
-
 enum looptype {
   LOOP_NORMAL,
   LOOP_BLOCK,
@@ -793,8 +781,8 @@ compile(hpc_state *p, node *ast)
 
   mrb_pool_close(scope->mpool);
 
-  return new_fundecl(p, mrb_intern(p->mrb, "compiled_main"), 0, main_body,
-      new_func_type(p, void_type, 0));
+  return new_fundecl(p, mrb_intern(p->mrb, "compiled_main"),
+      new_func_type(p, void_type, 0), 0, main_body);
 }
 
 HIR*
@@ -804,8 +792,6 @@ hpc_compile_file(hpc_state *s, FILE *rfp, mrbc_context *c)
 
   mrb_state *mrb = s->mrb;  /* It is necessary for E_SYNTAX_ERROR macro */
   parser_state *p = mrb_parse_file(s->mrb, rfp, c);
-
-  init_types(p);
 
   if (!p) return 0;
   if (!p->tree || p->nerr) {
@@ -831,10 +817,18 @@ hpc_compile_file(hpc_state *s, FILE *rfp, mrbc_context *c)
 }
 
 void
-init_hpc_compiler(mrb_state *mrb)
+init_hpc_compiler(hpc_state *p)
 {
-  lat_class = mrb_define_class(mrb, "Lattice", mrb->object_class);
-  lat_unknown = lat_new(mrb, LAT_UNKNOWN);
-  lat_dynamic = lat_new(mrb, LAT_DYNAMIC);
-  mrb_define_method(mrb, lat_class, "inspect", lat_inspect, ARGS_NONE());
+  lat_class = mrb_define_class(p->mrb, "Lattice", p->mrb->object_class);
+  lat_unknown = lat_new(p->mrb, LAT_UNKNOWN);
+  lat_dynamic = lat_new(p->mrb, LAT_DYNAMIC);
+  mrb_define_method(p->mrb, lat_class, "inspect", lat_inspect, ARGS_NONE());
+
+  void_type   = new_simple_type(p, HTYPE_VOID);
+  value_type  = new_simple_type(p, HTYPE_VALUE);
+  sym_type    = new_simple_type(p, HTYPE_SYM);
+  char_type   = new_simple_type(p, HTYPE_CHAR);
+  int_type    = new_simple_type(p, HTYPE_INT);
+  float_type  = new_simple_type(p, HTYPE_FLOAT);
+  string_type = new_simple_type(p, HTYPE_STRING);
 }

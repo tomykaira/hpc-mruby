@@ -234,8 +234,8 @@ main(int argc, char **argv)
   c->no_exec = 1;
   c->filename = args.filename;
 
-  init_hpc_compiler(mrb);
   hpc_state *p = hpc_state_new(mrb);
+  init_hpc_compiler(p);
   hir = hpc_compile_file(p, args.rfp, c);
 
   if (!hir) {

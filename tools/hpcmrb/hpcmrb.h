@@ -84,7 +84,7 @@ typedef struct hpc_state {
   jmp_buf jmp;
 } hpc_state;
 
-void init_hpc_compiler(mrb_state *mrb);
+void init_hpc_compiler(hpc_state *p);
 hpc_state* hpc_state_new(mrb_state *mrb);
 HIR *hpc_compile_file(hpc_state*, FILE*, mrbc_context*);
 mrb_value hpc_generate_code(hpc_state*, FILE*, HIR*, mrbc_context*);
