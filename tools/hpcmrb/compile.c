@@ -468,6 +468,12 @@ new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 }
 
 static HIR*
+new_pvardecl(hpc_state *p, HIR *type, mrb_sym sym)
+{
+  return list3((HIR*)HIR_PVARDECL, type, hirsym(sym));
+}
+
+static HIR*
 new_fundecl(hpc_state *p, mrb_sym sym, HIR *params, HIR *body, HIR *type)
 {
   return list5((HIR*)HIR_FUNDECL, hirsym(sym), params, body, type);
@@ -519,6 +525,12 @@ new_func_type(hpc_state *p, HIR *ret, HIR *params)
   return list3((HIR*)HTYPE_FUNC, ret, params);
 }
 
+static HIR*
+new_typedef_type(hpc_state *p, const char *name)
+{
+  return list2((HIR*)HTYPE_TYPEDEF, (HIR*)name);
+}
+
 static HIR *void_type;
 static HIR *value_type;
 static HIR *sym_type;
@@ -526,6 +538,7 @@ static HIR *char_type;
 static HIR *int_type;
 static HIR *float_type;
 static HIR *string_type;
+static HIR *mrb_state_ptr_type;
 
 enum looptype {
   LOOP_NORMAL,
@@ -774,15 +787,15 @@ static HIR*
 compile(hpc_state *p, node *ast)
 {
   hpc_scope *scope = scope_new(p, 0, 0);
-
   parser_dump(p->mrb, ast, 0);
-
   HIR *main_body = typing(scope, ast);
-
   mrb_pool_close(scope->mpool);
 
+  HIR *params = list1(
+      new_pvardecl(p, mrb_state_ptr_type, mrb_intern(p->mrb, "mrb"))
+      );
   return new_fundecl(p, mrb_intern(p->mrb, "compiled_main"),
-      new_func_type(p, void_type, 0), 0, main_body);
+      new_func_type(p, void_type, params), params, main_body);
 }
 
 HIR*
@@ -831,4 +844,5 @@ init_hpc_compiler(hpc_state *p)
   int_type    = new_simple_type(p, HTYPE_INT);
   float_type  = new_simple_type(p, HTYPE_FLOAT);
   string_type = new_simple_type(p, HTYPE_STRING);
+  mrb_state_ptr_type = new_ptr_type(p, new_typedef_type(p, "mrb_state"));
 }
