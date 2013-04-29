@@ -25,7 +25,7 @@ enum hir_type {
   HIR_INIT_LIST,  /* (:HIR_INIT_LIST values...) */
 
   /* statements */
-  HIR_BLOCK,      /* (:HIR_BLOCk (variables) statements...) */
+  HIR_BLOCK,      /* (:HIR_BLOCK declaration* statement*) */
   HIR_ASSIGN,     /* (:HIR_ASSIGN lhs rhs) */
   HIR_IFELSE,     /* (:HIR_IFELSE cond ifthen ifelse) */
   HIR_DOALL,      /* (:HIR_DOALL var low high body) */
