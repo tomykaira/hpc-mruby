@@ -42,9 +42,6 @@ enum hir_type {
   HIR_LVAR,       /* (:HIR_LVAR symbol) */
   HIR_GVAR,       /* (:HIR_GVAR symbol) */
   HIR_CALL,       /* (:HIR_CALL func args...) */
-
-  /* others */
-  HIR_TYPE,       /* (:HIR_TYPE hir_type_kind) */
 };
 
 enum hir_type_kind {
