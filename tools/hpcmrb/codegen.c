@@ -36,9 +36,7 @@ put_header(hpc_codegen_context *c)
 static void
 put_type(hpc_codegen_context *c, HIR *kind)
 {
-  hpc_assert(TYPE(kind) == HIR_TYPE);
-
-  enum hir_type_kind k = (intptr_t)CADR(kind);
+  enum hir_type_kind k = (intptr_t)kind->car;
 
   switch (k) {
     case HTYPE_CHAR:
@@ -58,10 +56,12 @@ put_type(hpc_codegen_context *c, HIR *kind)
       PUTS("char *");
       return;
     case HTYPE_PTR:
-      PUTS("void *");
+      put_type(CADR(kind));
+      PUTS(" *");
       return;
     case HTYPE_ARRAY:
-      PUTS("void **");
+    case HTYPE_FUNC:
+      NOT_REACHABLE();
       return;
     default:
       NOT_IMPLEMENTED();
@@ -76,19 +76,34 @@ put_symbol(hpc_codegen_context *c, HIR *hir)
   PUTS(name);
 }
 
-/*
-  FIXME:
-  def ::= (symbol . type)
-
-  Output:
-      int foo
- */
+/* Take two heads from hir as type and var */
 static void
-put_var_definition(hpc_codegen_context *c, HIR *def)
+put_variable(hpc_codegen_context *c, HIR *hir)
 {
-  put_type(c, CADR(def));
-  PUTS(" ");
-  put_symbol(c, def->car);
+  HIR *type = hir->car;
+  enum hir_type_kind k = (intptr_t)type->car;
+  HIR *var = CADR(hir);
+
+  switch (k) {
+  case HTYPE_ARRAY:
+    /* TODO: array in array */
+    put_type(c, CADR(type));     /* basetype */
+    PUTS(" ");
+    put_symbol(c, var);
+    {
+      char i[32];
+      sprintf(i, "[%d]", (intptr_t)CADDR(type));
+      PUTS(i);
+    }
+    return;
+  case HTYPE_FUNC:
+    /* function pointer? */
+    NOT_IMPLEMENTED();
+  default:
+    put_type(c, type);
+    PUTS(" ");
+    put_symbol(c, var);
+  }
 }
 
 static void
@@ -96,21 +111,14 @@ put_decl(hpc_codegen_context *c, HIR *decl)
 {
   switch (TYPE(decl)) {
     case HIR_GVARDECL:
-      /* FIXME: what is 'var'? */
-      put_var_definition(c, CADR(decl));
-      PUTS(" = ");
-      put_exp(c, CADDR(decl));
-      PUTS(";\n");
-      return;
     case HIR_LVARDECL:
-      put_var_definition(c, CADR(decl));
+      put_variable(decl->cdr);
       PUTS(" = ");
       put_exp(c, CADDR(decl));
       PUTS(";\n");
       return;
     case HIR_PVARDECL:
-      put_var_definition(c, CADR(decl));
-      PUTS(";\n");
+      put_variable(decl->cdr);
       return;
     case HIR_FUNDECL:
       NOT_IMPLEMENTED();
