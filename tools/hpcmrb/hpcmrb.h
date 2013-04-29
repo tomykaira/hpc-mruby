@@ -8,6 +8,7 @@ extern "C" {
 #include <stdio.h>
 #include "mruby.h"
 #include "mruby/compile.h"
+#include <setjmp.h>
 
 #define NOT_IMPLEMENTED() mrb_bug("%s(%d): not implemented", __func__, __LINE__)
 #define NOT_REACHABLE()   mrb_bug("%s(%d): not reachable here", __func__, __LINE__)
@@ -16,29 +17,29 @@ extern "C" {
 /* High-level intermediate representation. */
 enum hir_type {
   /* declarations */
-  HIR_GVARDECL,
-  HIR_LVARDECL,
-  HIR_PVARDECL,
-  HIR_FUNDECL,
+  HIR_GVARDECL,   /* (:HIR_GVARDECL var value) */
+  HIR_LVARDECL,   /* (:HIR_LVARDECL var value) */
+  HIR_PVARDECL,   /* (:HIR_PVARDECL var) */
+  HIR_FUNDECL,    /* (:HIR_FUNDECL var body (options...)) */
 
-  HIR_INIT_LIST,
+  HIR_INIT_LIST,  /* (:HIR_INIT_LIST values...) */
 
   /* statements */
-  HIR_SEQ,
-  HIR_ASSIGN,
-  HIR_IFELSE,
-  HIR_DOALL,
-  HIR_WHILE,
-  HIR_BREAK,
-  HIR_CONTINUE,
-  HIR_RETURN,
+  HIR_BLOCK,      /* (:HIR_BLOCk (variables) statements...) */
+  HIR_ASSIGN,     /* (:HIR_ASSIGN lhs rhs) */
+  HIR_IFELSE,     /* (:HIR_IFELSE cond ifthen ifelse) */
+  HIR_DOALL,      /* (:HIR_DOALL var low high body) */
+  HIR_WHILE,      /* (:HIR_WHILE cond body) */
+  HIR_BREAK,      /* (:HIR_BREAK) */
+  HIR_CONTINUE,   /* (:HIR_CONTINUE) */
+  HIR_RETURN,     /* (:HIR_RETURN) */
 
   /* expressions */
-  HIR_EMPTY,
-  HIR_LIT,
-  HIR_VAR,
-  HIR_CALL,
-  HIR_ADDRESSOF,
+  HIR_EMPTY,      /* (:HIR_EMPTY) */
+  HIR_INT,        /* (:HIR_INT value) */
+  HIR_FLOAT,      /* (:HIR_FLOAT value) */
+  HIR_VAR,        /* (:HIR_VAR symbol type) */
+  HIR_CALL,       /* (:HIR_CALL func args...) */
 
   /* others */
   HIR_TYPE,
@@ -70,9 +71,18 @@ typedef struct HIR {
   short lineno;
 } HIR;
 
+typedef struct hpc_state {
+  mrb_state *mrb;
+  struct mrb_pool *pool;
+  HIR *cells;
+  short line;
+  jmp_buf jmp;
+} hpc_state;
+
 void init_hpc_compiler(mrb_state *mrb);
-HIR *hpc_compile_file(mrb_state*, FILE*, mrbc_context*);
-mrb_value hpc_generate_code(mrb_state*, FILE*, HIR*, mrbc_context*);
+hpc_state* hpc_state_new(mrb_state *mrb);
+HIR *hpc_compile_file(hpc_state*, FILE*, mrbc_context*);
+mrb_value hpc_generate_code(hpc_state*, FILE*, HIR*, mrbc_context*);
 
 #if defined(__cplusplus)
 }  /* extern "C" { */

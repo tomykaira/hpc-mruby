@@ -17,7 +17,7 @@ put_decl(FILE *fp, HIR *decl)
 }
 
 mrb_value
-hpc_generate_code(mrb_state *mrb, FILE *fp, HIR *hir, mrbc_context *c)
+hpc_generate_code(hpc_state *s, FILE *fp, HIR *hir, mrbc_context *c)
 {
   puts("Generating C-program...");
   put_header(fp);

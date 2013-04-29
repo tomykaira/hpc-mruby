@@ -235,7 +235,8 @@ main(int argc, char **argv)
   c->filename = args.filename;
 
   init_hpc_compiler(mrb);
-  hir = hpc_compile_file(mrb, args.rfp, c);
+  hpc_state *p = hpc_state_new(mrb);
+  hir = hpc_compile_file(p, args.rfp, c);
 
   if (!hir) {
     cleanup(mrb, &args);
@@ -246,7 +247,7 @@ main(int argc, char **argv)
     cleanup(mrb, &args);
     return EXIT_SUCCESS;
   }
-  result = hpc_generate_code(mrb, args.wfp, hir, c);
+  result = hpc_generate_code(p, args.wfp, hir, c);
   if (mrb_undef_p(result) || mrb_fixnum(result) < 0) {
     cleanup(mrb, &args);
     return EXIT_FAILURE;

@@ -2,6 +2,7 @@
 #include "mruby/array.h"
 #include "mruby/data.h"
 #include "mruby/string.h"
+#include "node.h"
 
 /* Lattice for abstract intepreration */
 
@@ -375,18 +376,8 @@ lat_join(mrb_state *mrb, mrb_value val1, mrb_value val2)
 
 /* Compiler main */
 
-typedef struct compiler_state {
-  mrb_state *mrb;
-  struct mrb_pool *pool;
-  HIR *cells;
-  short line;
-  jmp_buf jmp;
-} hpc_compiler_state;
-
-typedef hpc_compiler_state compiler_state;
-
 static void*
-compiler_palloc(compiler_state *p, size_t size)
+compiler_palloc(hpc_state *p, size_t size)
 {
   void *m = mrb_pool_alloc(p->pool, size);
   if (!m) longjmp(p->jmp, 1);
@@ -394,7 +385,7 @@ compiler_palloc(compiler_state *p, size_t size)
 }
 
 static void
-cons_free_gen(compiler_state *p, HIR *cons)
+cons_free_gen(hpc_state *p, HIR *cons)
 {
   cons->cdr = p->cells;
   p->cells = cons;
@@ -402,7 +393,7 @@ cons_free_gen(compiler_state *p, HIR *cons)
 #define cons_free(c) cons_free_gen(p, (c))
 
 static HIR*
-cons_gen(compiler_state *p, HIR *car, HIR *cdr)
+cons_gen(hpc_state *p, HIR *car, HIR *cdr)
 {
   HIR *c;
   if (p->cells) {
@@ -420,22 +411,29 @@ cons_gen(compiler_state *p, HIR *car, HIR *cdr)
 }
 #define cons(a,b) cons_gen(p, (a), (b))
 
-static compiler_state*
-compiler_state_new(mrb_state *mrb)
+hpc_state*
+hpc_state_new(mrb_state *mrb)
 {
   mrb_pool *pool;
-  compiler_state *p;
-  static const compiler_state compiler_state_zero = { 0 };
+  hpc_state *p;
+  static const hpc_state hpc_state_zero = { 0 };
 
   pool = mrb_pool_open(mrb);
   if (!pool) return 0;
-  p = (compiler_state*)mrb_pool_alloc(pool, sizeof(compiler_state));
+  p = (hpc_state*)mrb_pool_alloc(pool, sizeof(hpc_state));
   if (!p) return 0;
 
-  *p = compiler_state_zero;
+  *p = hpc_state_zero;
   p->mrb = mrb;
   p->pool = pool;
   return p;
+}
+
+/* (:HIR_BLOCK (variables) stmt...) */
+static HIR*
+new_block(hpc_state *p, HIR *lv, HIR *body)
+{
+  return cons((HIR*)HIR_BLOCK, cons(lv, body));
 }
 
 typedef mrb_ast_node node;
@@ -461,12 +459,13 @@ struct loopinfo {
 
 typedef struct scope {
   mrb_state *mrb;
+  hpc_state *hpc;
   mrb_pool *mpool;
   jmp_buf jmp;
 
   struct scope *prev;
 
-  node *lv;
+  HIR *lv;
   int sp;
 
   int lastlabel;
@@ -486,7 +485,7 @@ typedef struct scope {
 } hpc_scope;
 
 static int
-node_len(node *tree)
+hir_len(HIR *tree)
 {
   int n = 0;
 
@@ -518,36 +517,76 @@ hpc_error(hpc_scope *s, const char *message)
 }
 
 static hpc_scope*
-scope_new(mrb_state *mrb, hpc_scope *prev, node *lv)
+scope_new(hpc_state *p, hpc_scope *prev, HIR *lv)
 {
   static const hpc_scope hpc_scope_zero = { 0 };
-  mrb_pool *pool = mrb_pool_open(mrb);
-  hpc_scope *p = (hpc_scope *)mrb_pool_alloc(pool, sizeof(hpc_scope));
+  mrb_pool *pool = mrb_pool_open(p->mrb);
+  hpc_scope *s = (hpc_scope *)mrb_pool_alloc(pool, sizeof(hpc_scope));
 
-  if (!p) hpc_error(p, "mrb_pool_alloc failed");
-  *p = hpc_scope_zero;
-  p->mrb = mrb;
-  p->mpool = pool;
-  if (!prev) return p;
-  p->prev = prev;
-  p->ainfo = -1;
-  p->mscope = 0;
-  p->lv = lv;
-  p->sp += node_len(lv) + 1;  /* +1 for self */
-  p->nlocals = p->sp;
-  p->ai = mrb_gc_arena_save(mrb);
+  if (!s) hpc_error(s, "mrb_pool_alloc failed");
+  *s = hpc_scope_zero;
+  s->hpc = p;
+  s->mrb = p->mrb;
+  s->mpool = pool;
+  if (!prev) return s;
+  s->prev = prev;
+  s->ainfo = -1;
+  s->mscope = 0;
+  s->lv = lv;
+  s->sp += hir_len(lv) + 1;  /* +1 for self */
+  s->nlocals = s->sp;
+  s->ai = mrb_gc_arena_save(p->mrb);
 
-  p->filename = prev->filename;
-  p->lineno = prev->lineno;
-  return p;
+  s->filename = prev->filename;
+  s->lineno = prev->lineno;
+  return s;
+}
+
+static void
+scope_finish(hpc_scope *s)
+{
+  mrb_state *mrb = s->mrb;
+  mrb_gc_arena_restore(mrb, s->ai);
+  mrb_pool_close(s->mpool);
+}
+
+static HIR *typing(hpc_scope *s, node *tree);
+
+static HIR*
+typing_scope(hpc_scope *s, node *tree)
+{
+  hpc_scope *scope = scope_new(s->hpc, s, 0 /* tree->car */);
+  HIR* hir = new_block(s->hpc, scope->lv, typing(scope, tree->cdr));
+  scope_finish(scope);
+  return hir;
 }
 
 static HIR*
-compile(mrb_state *mrb, node *ast)
+typing(hpc_scope *s, node *tree)
 {
-  hpc_scope *scope = scope_new(mrb, 0, 0);
+  int type;
+  if (!tree) return 0;
+  s->lineno = tree->lineno;
+  type = (intptr_t)tree->car;
+  tree = tree->cdr;
+  switch (type) {
+    case NODE_SCOPE:
+      return typing_scope(s, tree);
+    case NODE_BEGIN:
+    case NODE_INT:
+    default:
+      NOT_REACHABLE();
+  }
+}
 
-  parser_dump(mrb, ast, 0);
+static HIR*
+compile(hpc_state *p, node *ast)
+{
+  hpc_scope *scope = scope_new(p, 0, 0);
+
+  parser_dump(p->mrb, ast, 0);
+
+  HIR *hir = typing(scope, ast);
 
   mrb_pool_close(scope->mpool);
   puts("compile: NOT IMPLEMENTED YET");
@@ -555,10 +594,12 @@ compile(mrb_state *mrb, node *ast)
 }
 
 HIR*
-hpc_compile_file(mrb_state *mrb, FILE *rfp, mrbc_context *c)
+hpc_compile_file(hpc_state *s, FILE *rfp, mrbc_context *c)
 {
   puts("Compiling...");
-  parser_state *p = mrb_parse_file(mrb, rfp, c);
+
+  mrb_state *mrb = s->mrb;  /* It is necessary for E_SYNTAX_ERROR macro */
+  parser_state *p = mrb_parse_file(s->mrb, rfp, c);
 
   if (!p) return 0;
   if (!p->tree || p->nerr) {
@@ -578,7 +619,7 @@ hpc_compile_file(mrb_state *mrb, FILE *rfp, mrbc_context *c)
       return 0;
     }
   }
-  HIR *tree = compile(mrb, p->tree);
+  HIR *tree = compile(s, p->tree);
   mrb_parser_free(p);
   return tree;
 }
