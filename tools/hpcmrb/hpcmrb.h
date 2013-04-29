@@ -25,7 +25,8 @@ enum hir_type {
   HIR_INIT_LIST,  /* (:HIR_INIT_LIST values...) */
 
   /* statements */
-  HIR_BLOCK,      /* (:HIR_BLOCk (variables) statements...) */
+  HIR_SCOPE,      /* (:HIR_SCOPE (vars...) . statement) */
+  HIR_BLOCK,      /* (:HIR_BLOCk (statements...)) */
   HIR_ASSIGN,     /* (:HIR_ASSIGN lhs rhs) */
   HIR_IFELSE,     /* (:HIR_IFELSE cond ifthen ifelse) */
   HIR_DOALL,      /* (:HIR_DOALL var low high body) */
@@ -38,7 +39,8 @@ enum hir_type {
   HIR_EMPTY,      /* (:HIR_EMPTY) */
   HIR_INT,        /* (:HIR_INT value) */
   HIR_FLOAT,      /* (:HIR_FLOAT value) */
-  HIR_VAR,        /* (:HIR_VAR symbol type) */
+  HIR_LVAR,       /* (:HIR_LVAR symbol) */
+  HIR_GVAR,       /* (:HIR_GVAR symbol) */
   HIR_CALL,       /* (:HIR_CALL func args...) */
 
   /* others */
@@ -68,6 +70,7 @@ enum hir_var_kind {
 
 typedef struct HIR {
   struct HIR *car, *cdr;
+  mrb_value type;
   short lineno;
 } HIR;
 

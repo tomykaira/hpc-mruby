@@ -1,3 +1,5 @@
+#include <ctype.h>
+#include <string.h>
 #include "hpcmrb.h"
 #include "mruby/array.h"
 #include "mruby/data.h"
@@ -376,6 +378,13 @@ lat_join(mrb_state *mrb, mrb_value val1, mrb_value val2)
 
 /* Compiler main */
 
+typedef mrb_ast_node node;
+typedef struct mrb_parser_state parser_state;
+void parser_dump(mrb_state *mrb, node *tree, int offset);
+
+#define sym(x) ((mrb_sym)(intptr_t)(x))
+#define hirsym(x) ((HIR*)(intptr_t)(x))
+
 static void*
 compiler_palloc(hpc_state *p, size_t size)
 {
@@ -407,9 +416,15 @@ cons_gen(hpc_state *p, HIR *car, HIR *cdr)
   c->car = car;
   c->cdr = cdr;
   c->lineno = 0;
+  c->type = lat_unknown;
   return c;
 }
 #define cons(a,b) cons_gen(p, (a), (b))
+#define list1(a)          cons((a), 0)
+#define list2(a,b)        cons((a), cons((b), 0))
+#define list3(a,b,c)      cons((a), cons((b), cons((c), 0)))
+#define list4(a,b,c,d)    cons((a), cons((b), cons((c), cons((d), 0))))
+#define list5(a,b,c,d,e)  cons((a), cons((b), cons((c), cons((d), cons((e), 0)))))
 
 hpc_state*
 hpc_state_new(mrb_state *mrb)
@@ -429,18 +444,41 @@ hpc_state_new(mrb_state *mrb)
   return p;
 }
 
-/* (:HIR_BLOCK (variables) stmt...) */
 static HIR*
-new_block(hpc_state *p, HIR *lv, HIR *body)
+new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 {
-  return cons((HIR*)HIR_BLOCK, cons(lv, body));
+  HIR *var = cons((HIR*)HIR_LVAR, hirsym(sym));
+  var->type = lat;
+  return var;
 }
 
-typedef mrb_ast_node node;
-typedef struct mrb_parser_state parser_state;
+static HIR*
+new_scope(hpc_state *p, HIR *lv, HIR *body)
+{
+  return cons((HIR*)HIR_SCOPE, cons(lv, body));
+}
 
-void parser_dump(mrb_state *mrb, node *tree, int offset);
+static HIR*
+new_block(hpc_state *p, HIR *stmts)
+{
+  return list2((HIR*)HIR_BLOCK, stmts);
+}
 
+static HIR*
+new_int(hpc_state *p, char *text, int base, mrb_int val)
+{
+  HIR *lit = list3((HIR*)HIR_INT, (HIR*)text, (HIR*)(intptr_t)base);
+  lit->type = mrb_fixnum_value(val);
+  return lit;
+}
+
+static HIR*
+new_float(hpc_state *p, char *text, int base, double val)
+{
+  HIR *lit = list3((HIR*)HIR_FLOAT, (HIR*)text, (HIR*)(intptr_t)base);
+  lit->type = mrb_float_value(val);
+  return lit;
+}
 
 enum looptype {
   LOOP_NORMAL,
@@ -516,6 +554,75 @@ hpc_error(hpc_scope *s, const char *message)
   longjmp(s->jmp, 1);
 }
 
+static double
+readint_float(hpc_scope *s, const char *p, int base)
+{
+  const char *e = p + strlen(p);
+  double f = 0;
+  int n;
+
+  if (*p == '+') p++;
+  while (p < e) {
+    char c = *p;
+    c = tolower((unsigned char)c);
+    for (n=0; n<base; n++) {
+      if (mrb_digitmap[n] == c) {
+        f *= base;
+        f += n;
+        break;
+      }
+    }
+    if (n == base) {
+      hpc_error(s, "malformed readint input");
+    }
+    p++;
+  }
+  return f;
+}
+
+static mrb_int
+readint_mrb_int(hpc_scope *s, const char *p, int base, int neg, int *overflow)
+{
+  const char *e = p + strlen(p);
+  mrb_int result = 0;
+  int n;
+
+  if (*p == '+') p++;
+  while (p < e) {
+    char c = *p;
+    c = tolower((unsigned char)c);
+    for (n=0; n<base; n++) {
+      if (mrb_digitmap[n] == c) {
+        break;
+      }
+    }
+    if (n == base) {
+      hpc_error(s, "malformed readint input");
+    }
+
+    if (neg) {
+      if ((MRB_INT_MIN + n)/base > result) {
+        *overflow = TRUE;
+        return 0;
+      }
+      result *= base;
+      result -= n;
+    }
+    else {
+      if ((MRB_INT_MAX - n)/base < result) {
+        *overflow = TRUE;
+        return 0;
+      }
+      result *= base;
+      result += n;
+    }
+    p++;
+  }
+  *overflow = FALSE;
+  return result;
+}
+
+
 static hpc_scope*
 scope_new(hpc_state *p, hpc_scope *prev, HIR *lv)
 {
@@ -555,8 +662,19 @@ static HIR *typing(hpc_scope *s, node *tree);
 static HIR*
 typing_scope(hpc_scope *s, node *tree)
 {
-  hpc_scope *scope = scope_new(s->hpc, s, 0 /* tree->car */);
-  HIR* hir = new_block(s->hpc, scope->lv, typing(scope, tree->cdr));
+  HIR* hir;
+  HIR* lv = 0;
+  node* n = tree->car;
+  hpc_state *p = s->hpc;
+
+  while (n) {
+    if (n->car)
+      lv = cons(new_lvar(p, sym(n->car), lat_unknown), lv);
+    n = n->cdr;
+  }
+
+  hpc_scope *scope = scope_new(p, s, lv);
+  hir = new_scope(p, scope->lv, typing(scope, tree->cdr));
   scope_finish(scope);
   return hir;
 }
@@ -564,16 +682,41 @@ typing_scope(hpc_scope *s, node *tree)
 static HIR*
 typing(hpc_scope *s, node *tree)
 {
-  int type;
   if (!tree) return 0;
+  hpc_state *p = s->hpc;
   s->lineno = tree->lineno;
-  type = (intptr_t)tree->car;
+  int type = (intptr_t)tree->car;
   tree = tree->cdr;
   switch (type) {
     case NODE_SCOPE:
       return typing_scope(s, tree);
     case NODE_BEGIN:
+      {
+        HIR *stmts = 0, *last = 0, *stmt;
+        while (tree) {
+          stmt = typing(s, tree->car);
+          if (!stmts)
+            stmts = last = cons(stmt, 0);
+          else
+            last->cdr = cons(stmt, 0);
+          last = stmt;
+        }
+        return new_block(p, stmts);
+      }
     case NODE_INT:
+      {
+        char *txt = (char*)tree->car;
+        int base = (intptr_t)tree->cdr->car;
+        mrb_int i;
+        int overflow;
+        i = readint_mrb_int(s, txt, base, FALSE, &overflow);
+        if (overflow) {
+          double f = readint_float(s, txt, base);
+          return new_float(p, txt, base, f);
+        } else {
+          return new_int(p, txt, base, i);
+        }
+      }
     default:
       NOT_REACHABLE();
   }
@@ -589,8 +732,7 @@ compile(hpc_state *p, node *ast)
   HIR *hir = typing(scope, ast);
 
   mrb_pool_close(scope->mpool);
-  puts("compile: NOT IMPLEMENTED YET");
-  return (HIR*)1;
+  return hir;
 }
 
 HIR*
