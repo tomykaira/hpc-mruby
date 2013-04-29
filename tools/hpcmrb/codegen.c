@@ -114,8 +114,10 @@ put_decl(hpc_codegen_context *c, HIR *decl)
     case HIR_GVARDECL:
     case HIR_LVARDECL:
       put_variable(decl->cdr);
-      PUTS(" = ");
-      put_exp(c, CADDR(decl));
+      if (TYPE(CADDR(decl)) != HIR_EMPTY) {
+        PUTS(" = ");
+        put_exp(c, CADDR(decl));
+      }
       PUTS(";\n");
       return;
     case HIR_PVARDECL:
@@ -158,8 +160,7 @@ put_exp(hpc_codegen_context *c, HIR *exp)
   char buf[1024];
   switch (TYPE(exp)) {
     case HIR_EMPTY:
-      /* FIXME */
-      return;
+      NOT_REACHABLE();
     case HIR_INT:
     case HIR_FLOAT:
       PUTS((char *)CADR(exp));
