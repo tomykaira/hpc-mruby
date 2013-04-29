@@ -37,8 +37,8 @@ enum hir_type {
 
   /* expressions */
   HIR_EMPTY,      /* (:HIR_EMPTY) */
-  HIR_INT,        /* (:HIR_INT value) */
-  HIR_FLOAT,      /* (:HIR_FLOAT value) */
+  HIR_INT,        /* (:HIR_INT text base) */
+  HIR_FLOAT,      /* (:HIR_FLOAT text base) */
   HIR_LVAR,       /* (:HIR_LVAR symbol) */
   HIR_GVAR,       /* (:HIR_GVAR symbol) */
   HIR_CALL,       /* (:HIR_CALL func args...) */

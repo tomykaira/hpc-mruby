@@ -1,6 +1,8 @@
 #include "hpcmrb.h"
 #include <stdint.h>
 
+#if 0
+
 #define CADR(x) ((x)->cdr->car)
 #define CADDR(x) ((x)->cdr->cdr->car)
 #define CADDDR(x) ((x)->cdr->cdr->cdr->car)
@@ -259,10 +261,12 @@ put_statement(hpc_codegen_context *c, HIR *stat)
   }
 }
 
+#endif
 
 mrb_value
 hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
 {
+#if 0
   hpc_codegen_context c;
 
   puts("Generating C-program...");
@@ -277,5 +281,7 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   //  hir = hir->cdr;
   //}
 
+  return mrb_fixnum_value(0);
+#endif
   return mrb_fixnum_value(0);
 }

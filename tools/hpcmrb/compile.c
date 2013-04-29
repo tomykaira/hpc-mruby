@@ -468,6 +468,12 @@ new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 }
 
 static HIR*
+new_fundecl(hpc_state *p, mrb_sym sym, HIR *params, HIR *body, HIR *type)
+{
+  return list5((HIR*)HIR_FUNDECL, hirsym(sym), params, body, type);
+}
+
+static HIR*
 new_scope(hpc_state *p, HIR *lv, HIR *body)
 {
   return cons((HIR*)HIR_SCOPE, cons(lv, body));
@@ -493,6 +499,44 @@ new_float(hpc_state *p, char *text, int base, double val)
   HIR *lit = list3((HIR*)HIR_FLOAT, (HIR*)text, (HIR*)(intptr_t)base);
   lit->type = mrb_float_value(val);
   return lit;
+}
+
+static HIR*
+new_simple_type(hpc_state *p, enum hir_type_kind kind)
+{
+  return list1((HIR*)kind);
+}
+
+static HIR*
+new_ptr_type(hpc_state *p, HIR *base)
+{
+  return list2((HIR*)HTYPE_PTR, base);
+}
+
+static HIR*
+new_func_type(hpc_state *p, HIR *ret, HIR *params)
+{
+  return list3((HIR*)HTYPE_FUNC, ret, params);
+}
+
+static HIR *void_type;
+static HIR *value_type;
+static HIR *sym_type;
+static HIR *char_type;
+static HIR *int_type;
+static HIR *float_type;
+static HIR *string_type;
+
+static void
+init_types(hpc_state *p)
+{
+  void_type   = new_simple_type(p, HTYPE_VOID);
+  value_type  = new_simple_type(p, HTYPE_VALUE);
+  sym_type    = new_simple_type(p, HTYPE_SYM);
+  char_type   = new_simple_type(p, HTYPE_CHAR);
+  int_type    = new_simple_type(p, HTYPE_INT);
+  float_type  = new_simple_type(p, HTYPE_FLOAT);
+  string_type = new_simple_type(p, HTYPE_STRING);
 }
 
 enum looptype {
@@ -745,10 +789,12 @@ compile(hpc_state *p, node *ast)
 
   parser_dump(p->mrb, ast, 0);
 
-  HIR *hir = typing(scope, ast);
+  HIR *main_body = typing(scope, ast);
 
   mrb_pool_close(scope->mpool);
-  return hir;
+
+  return new_fundecl(p, mrb_intern(p->mrb, "compiled_main"), 0, main_body,
+      new_func_type(p, void_type, 0));
 }
 
 HIR*
@@ -758,6 +804,8 @@ hpc_compile_file(hpc_state *s, FILE *rfp, mrbc_context *c)
 
   mrb_state *mrb = s->mrb;  /* It is necessary for E_SYNTAX_ERROR macro */
   parser_state *p = mrb_parse_file(s->mrb, rfp, c);
+
+  init_types(p);
 
   if (!p) return 0;
   if (!p->tree || p->nerr) {
