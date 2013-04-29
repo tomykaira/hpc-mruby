@@ -40,6 +40,12 @@ put_type(hpc_codegen_context *c, HIR *kind)
   enum hir_type_kind k = (intptr_t)kind->car;
 
   switch (k) {
+    case HTYPE_VOID:
+      PUTS("void");
+    case HTYPE_VALUE:
+      PUTS("mrb_value");
+    case HTYPE_SYM:
+      PUTS("mrb_sym");
     case HTYPE_CHAR:
       PUTS("char");
       return;
