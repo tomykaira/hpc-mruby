@@ -186,16 +186,28 @@ static void
 put_statement(hpc_codegen_context *c, HIR *stat)
 {
   switch (TYPE(stat)) {
+    case HIR_SCOPE:
+      {
+        /* FIXME: redundant {} when HIR_SCOPE has HIR_BLOCK as a child */
+        HIR *decls = CADR(stat);
+        HIR *inner_stat = stat->cdr->cdr;
+        PUTS("{\n");
+        INDENT_PP;
+        while (decls) {
+          put_decl(c, decls->car);
+          decls = decls->cdr;
+        }
+        PUTS("\n");
+        put_statement(c, inner_stat);
+        INDENT_MM;
+        PUTS("}\n");
+      }
+      return;
     case HIR_BLOCK:
       {
         HIR *stats = stat->cdr;
         PUTS("{\n");
         INDENT_PP;
-        while (DECLP(TYPE(stats))) {
-          put_decl(c, stats->car);
-          stats = stats->cdr;
-        }
-        PUTS("\n");
         while (stats) {
           put_statement(c, stats->car);
           stats = stats->cdr;
