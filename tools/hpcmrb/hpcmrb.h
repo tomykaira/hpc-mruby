@@ -20,7 +20,7 @@ enum hir_type {
   HIR_GVARDECL,   /* (:HIR_GVARDECL var value) */
   HIR_LVARDECL,   /* (:HIR_LVARDECL var value) */
   HIR_PVARDECL,   /* (:HIR_PVARDECL var) */
-  HIR_FUNDECL,    /* (:HIR_FUNDECL var body (options...)) */
+  HIR_FUNDECL,    /* (:HIR_FUNDECL sym params body (options...)) */
 
   HIR_INIT_LIST,  /* (:HIR_INIT_LIST values...) */
 
@@ -77,6 +77,7 @@ typedef struct HIR {
 typedef struct hpc_state {
   mrb_state *mrb;
   struct mrb_pool *pool;
+  HIR *decls;
   HIR *cells;
   short line;
   jmp_buf jmp;
