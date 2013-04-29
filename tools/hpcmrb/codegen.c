@@ -77,7 +77,8 @@ put_symbol(hpc_codegen_context *c, HIR *hir)
 }
 
 /*
-  def ::= (:HIR_VAR symbol type)
+  FIXME:
+  def ::= (symbol . type)
 
   Output:
       int foo
@@ -85,11 +86,9 @@ put_symbol(hpc_codegen_context *c, HIR *hir)
 static void
 put_var_definition(hpc_codegen_context *c, HIR *def)
 {
-  hpc_assert(TYPE(def) == HIR_VAR);
-
-  put_type(c, CADDR(def));
+  put_type(c, CADR(def));
   PUTS(" ");
-  put_symbol(c, CADR(def));
+  put_symbol(c, def->car);
 }
 
 static void
@@ -97,6 +96,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
 {
   switch (TYPE(decl)) {
     case HIR_GVARDECL:
+      /* FIXME: what is 'var'? */
       put_var_definition(c, CADR(decl));
       PUTS(" = ");
       put_exp(c, CADDR(decl));
@@ -148,7 +148,8 @@ put_exp(hpc_codegen_context *c, HIR *exp)
         PUTS(buf);
       }
       return;
-    case HIR_VAR:
+    case HIR_LVAR:
+    case HIR_GVAR:
       put_symbol(c, CADR(exp));
       return;
     case HIR_CALL:
