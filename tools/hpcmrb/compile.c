@@ -196,18 +196,31 @@ lat_le(mrb_state *mrb, mrb_value lat1, mrb_value lat2)
 
 /* utilities */
 
+/*
+  const_lat is a Class object
+  Call this directly when a mruby object is known to be a class
+  (e.g. an element of another LAT_SET)
+*/
+static int
+lat_set_add_const(mrb_state *mrb, mrb_value lat, mrb_value klass)
+{
+  hpc_assert(LAT_HAS_TYPE(mrb, lat, LAT_SET));
+  hpc_assert(!LAT_P(mrb, klass) && mrb_obj_class(mrb, klass) == mrb->class_class);
+
+  if (lat_include(mrb, lat, klass))
+    return FALSE;
+
+  mrb_ary_push(mrb, LAT(lat)->elems, klass);
+  return TRUE;
+}
+
+/*
+  val is a constant value occurred in the target code
+*/
 static int
 lat_set_add(mrb_state *mrb, mrb_value lat, mrb_value val)
 {
-  hpc_assert(LAT_HAS_TYPE(mrb, lat, LAT_SET));
-  hpc_assert(!LAT_HAS_TYPE(mrb, val, LAT_SET));
-  if (!LAT_P(mrb, val))
-    val = mrb_obj_value(mrb_obj_class(mrb, val));
-  if (lat_include(mrb, lat, val))
-    return FALSE;
-
-  mrb_ary_push(mrb, LAT(lat)->elems, val);
-  return TRUE;
+  return lat_set_add_const(mrb, lat, mrb_obj_value(mrb_obj_class(mrb, val)));
 }
 
 /* check lat == {val} */
@@ -328,6 +341,21 @@ lat_clone(mrb_state *mrb, mrb_value lat)
 }
 
 static mrb_value
+lat_merge_set(mrb_state *mrb, mrb_value set1, mrb_value set2)
+{
+  mrb_value *ary = RARRAY_PTR(LAT(set2)->elems);
+  int i, len = RARRAY_LEN(LAT(set2)->elems);
+
+  hpc_assert(LAT_HAS_TYPE(mrb, set1, LAT_SET));
+  hpc_assert(LAT_HAS_TYPE(mrb, set2, LAT_SET));
+
+  set1 = lat_clone(mrb, set1);
+  for (i = 0; i < len; i++)
+    lat_set_add_const(mrb, set1, ary[i]);
+  return set1;
+}
+
+static mrb_value
 lat_join(mrb_state *mrb, mrb_value val1, mrb_value val2)
 {
   /* TODO: treat instance variables */
@@ -354,15 +382,7 @@ lat_join(mrb_state *mrb, mrb_value val1, mrb_value val2)
           NOT_REACHABLE();
       }
     case LAT_SET:
-      hpc_assert(LAT_HAS_TYPE(mrb, val2, LAT_SET));
-      {
-        mrb_value *ary = RARRAY_PTR(LAT(val2)->elems);
-        int i, len = RARRAY_LEN(LAT(val2)->elems);
-        val1 = lat_clone(mrb, val1);
-        for (i = 0; i < len; i++)
-          lat_set_add(mrb, val1, ary[i]);
-        return val1;
-      }
+      return lat_merge_set(mrb, val1, val2);
     default:
       NOT_REACHABLE();
   }
