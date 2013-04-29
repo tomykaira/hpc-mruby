@@ -26,7 +26,7 @@ enum hir_type {
 
   /* statements */
   HIR_SCOPE,      /* (:HIR_SCOPE (vars...) . statement) */
-  HIR_BLOCK,      /* (:HIR_BLOCk (statements...)) */
+  HIR_BLOCK,      /* (:HIR_BLOCK (statements...)) */
   HIR_ASSIGN,     /* (:HIR_ASSIGN lhs rhs) */
   HIR_IFELSE,     /* (:HIR_IFELSE cond ifthen ifelse) */
   HIR_DOALL,      /* (:HIR_DOALL var low high body) */
@@ -44,7 +44,7 @@ enum hir_type {
   HIR_CALL,       /* (:HIR_CALL func args...) */
 
   /* others */
-  HIR_TYPE,
+  HIR_TYPE,       /* (:HIR_TYPE hir_type_kind) */
 };
 
 enum hir_type_kind {
