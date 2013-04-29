@@ -38,11 +38,11 @@ enum hir_type {
   HIR_EMPTY,      /* (:HIR_EMPTY) */
   HIR_INT,        /* (:HIR_INT value) */
   HIR_FLOAT,      /* (:HIR_FLOAT value) */
-  HIR_VAR,        /* (:HIR_VAR symbol type) */
+  HIR_VAR,        /* (:HIR_VAR mrb_sym type) */
   HIR_CALL,       /* (:HIR_CALL func args...) */
 
   /* others */
-  HIR_TYPE,
+  HIR_TYPE,       /* (:HIR_TYPE hir_type_kind) */
 };
 
 enum hir_type_kind {
