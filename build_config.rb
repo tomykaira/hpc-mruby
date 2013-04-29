@@ -55,7 +55,7 @@ MRuby::Build.new do |conf|
 
 
   # Generate binaries
-  # conf.bins = %w(mrbc)
+  conf.bins = %w(mrbc hpcmrb)
 
   # Generate mirb command
   conf.gem "#{root}/mrbgems/mruby-bin-mirb"
