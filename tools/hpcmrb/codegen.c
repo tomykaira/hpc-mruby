@@ -93,13 +93,23 @@ put_variable(hpc_codegen_context *c, HIR *hir)
   switch (k) {
   case HTYPE_ARRAY:
     /* TODO: array in array */
-    put_type(c, CADR(type));     /* basetype */
-    PUTS(" ");
-    put_symbol(c, var);
     {
-      char i[32];
-      sprintf(i, "[%d]", (intptr_t)CADDR(type));
-      PUTS(i);
+      int indices[1024];
+      int length, i;
+
+      /* link basetypes */
+      for (length = 0; TYPE(type) == HTYPE_ARRAY; length++) {
+        indices[length] = (intptr_t)CADDR(type);
+        type = CADR(type);
+      }
+      put_type(c, type);
+      PUTS(" ");
+      put_symbol(c, var);
+      for (i = 0; i <= length; i ++) {
+        char buf[32];
+        sprintf(buf, "[%d]", indices[i]);
+        PUTS(buf);
+      }
     }
     return;
   case HTYPE_FUNC:
