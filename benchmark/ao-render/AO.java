@@ -15,9 +15,9 @@ import java.io.*;
 import java.math.*;
 
 final class Vec {
-    float x, y, z;
+    double x, y, z;
 
-    Vec(float x, float y, float z) {
+    Vec(double x, double y, double z) {
         this.x = x;
         this.y = y;
         this.z = z;
@@ -38,29 +38,29 @@ final class Vec {
     }
 
     Vec cross(Vec b) {
-        float u = this.y * b.z - b.y * this.z;
-        float v = this.z * b.x - b.z * this.x;
-        float w = this.x * b.y - b.x * this.y;
+        double u = this.y * b.z - b.y * this.z;
+        double v = this.z * b.x - b.z * this.x;
+        double w = this.x * b.y - b.x * this.y;
         return new Vec(u, v, w);
     }
 
     void normalize() {
-        float d = this.len();
+        double d = this.len();
 
-        if (Math.abs(d) > 1.0e-6) {
-            float invlen = 1.0f / d;
-            this.x *= invlen;
-            this.y *= invlen;
-            this.z *= invlen;
+        if (Math.abs(d) > 1.0e-17) {
+            //double invlen = 1.0f / d;
+            this.x /= d;
+            this.y /= d;
+            this.z /= d;
         }
     }
 
-    float len() {
-        float d = this.x * this.x + this.y * this.y + this.z * this.z;
-        return (float)Math.sqrt(d);
+    double len() {
+        double d = this.x * this.x + this.y * this.y + this.z * this.z;
+        return (double)Math.sqrt(d);
     }
 
-    float dot(Vec b) {
+    double dot(Vec b) {
         return this.x * b.x + this.y * b.y + this.z * b.z;
     }
 
@@ -81,14 +81,14 @@ final class Ray {
 
 
 final class Intersection {
-    float t;
+    double t;
     Vec p; // hit point
     Vec n; // normal
     boolean hit;
 
     Intersection() {
         hit = false;
-        t = 1.0e+30f;
+        t = 10000000.0;
         n = new Vec(0.0f, 0.0f, 0.0f);
     }
 }
@@ -96,21 +96,21 @@ final class Intersection {
 
 final class Sphere {
     Vec center;
-    float radius;
+    double radius;
 
-    Sphere(Vec center, float radius) {
+    Sphere(Vec center, double radius) {
         this.center = center;
         this.radius = radius;
     }
 
     void intersect(Intersection isect, Ray ray) {
         Vec rs = ray.org.sub(this.center);
-        float B = rs.dot(ray.dir);
-        float C = rs.dot(rs) - (this.radius * this.radius);
-        float D = B * B - C;
+        double B = rs.dot(ray.dir);
+        double C = rs.dot(rs) - (this.radius * this.radius);
+        double D = B * B - C;
 
         if (D > 0.0) {
-            float t = -B - (float)Math.sqrt(D);
+            double t = -B - (double)Math.sqrt(D);
             if ((t > 0.0) && (t < isect.t)) {
                 isect.t = t;
                 isect.hit = true;
@@ -139,13 +139,13 @@ final class Plane {
     }
 
     void intersect(Intersection isect, Ray ray) {
-        float d = -p.dot(n);
-        float v = ray.dir.dot(n);
+        double d = -p.dot(n);
+        double v = ray.dir.dot(n);
 
-        if (Math.abs(v) < 1.0e-6)
+        if (Math.abs(v) < 1.0e-17)
             return; // the plane is parallel to the ray.
 
-        float t = -(ray.org.dot(n) + d) / v;
+        double t = -(ray.org.dot(n) + d) / v;
 
         if ((t > 0) && (t < isect.t)) {
             isect.hit = true;
@@ -174,18 +174,18 @@ final public class AO {
 
     void setup() {
         spheres = new Sphere[3];
-        spheres[0] = new Sphere(new Vec(-2.0f, 0.0f, -3.5f), 0.5f);
-        spheres[1] = new Sphere(new Vec(-0.5f, 0.0f, -3.0f), 0.5f);
-        spheres[2] = new Sphere(new Vec(1.0f, 0.0f, -2.2f), 0.5f);
-        plane = new Plane(new Vec(0.0f, -0.5f, 0.0f), new Vec(0.0f, 1.0f, 0.0f));
+        spheres[0] = new Sphere(new Vec(-2.0, 0.0, -3.5), 0.5);
+        spheres[1] = new Sphere(new Vec(-0.5, 0.0, -3.0), 0.5);
+        spheres[2] = new Sphere(new Vec(1.0, 0.0, -2.2), 0.5);
+        plane = new Plane(new Vec(0.0, -0.5, 0.0), new Vec(0.0, 1.0, 0.0));
     }
 
-    char clamp(float f) {
-        int i = (int)(f * 255.5);
-        if (i < 0)
-            i = 0;
-        if (i > 255)
-            i = 255;
+    char clamp(double f) {
+        double i = f * 255.5;
+        if (i < 0.0)
+            i = 0.0;
+        if (i > 255.0)
+            i = 255.0;
         return (char)i;
 
     }
@@ -212,11 +212,27 @@ final public class AO {
         basis[1].normalize();
     }
 
+    int x = 123456789,
+        y = 362436069,
+        z = 521288629,
+        w = 88675123;    
+
+    double random(){
+        final int BNUM = 1<< 29;
+        final double BNUMF = BNUM;
+        int t = x ^ ((x & 0xfffff) << 11);
+        x=y;
+        y=z;
+        z=w;
+        w=(w ^ (w >> 19) ^ (t ^ (t >> 8)));
+        return (w % BNUM) / BNUMF;
+    }
+
     Vec ambientOcclusion(Intersection isect) {
         int i, j;
         int ntheta = NAO_SAMPLES;
         int nphi = NAO_SAMPLES;
-        float eps = 0.0001f;
+        double eps = 0.0001f;
 
         // Slightly move ray org towards ray dir to avoid numerical probrem.
         Vec p = new Vec(isect.p.x + eps * isect.n.x,
@@ -227,23 +243,23 @@ final public class AO {
         Vec basis[]; basis = new Vec[3];
         orthoBasis(basis, isect.n);
 
-        float occlusion = 0.0f;
+        double occlusion = 0.0f;
 
         for (j = 0; j < ntheta; j++) {
             for (i = 0; i < nphi; i++) {
                 // Pick a random ray direction with importance sampling.
-                float r = (float)Math.random();
-                float phi = 2.0f * (float)Math.PI * (float)Math.random();
+                double r = (double)random();
+                double phi = 2.0f * 3.14159265 * (double)random();
 
-                float sq = (float)Math.sqrt(1.0 - r);
-                float x = (float)Math.cos(phi) * sq;
-                float y = (float)Math.sin(phi) * sq;
-                float z = (float)Math.sqrt(r);
+                double sq = (double)Math.sqrt(1.0 - r);
+                double x = (double)Math.cos(phi) * sq;
+                double y = (double)Math.sin(phi) * sq;
+                double z = (double)Math.sqrt(r);
 
                 // local -> global
-                float rx = x * basis[0].x + y * basis[1].x + z * basis[2].x;
-                float ry = x * basis[0].y + y * basis[1].y + z * basis[2].y;
-                float rz = x * basis[0].z + y * basis[1].z + z * basis[2].z;
+                double rx = x * basis[0].x + y * basis[1].x + z * basis[2].x;
+                double ry = x * basis[0].y + y * basis[1].y + z * basis[2].y;
+                double rz = x * basis[0].z + y * basis[1].z + z * basis[2].z;
 
                 Vec raydir = new Vec(rx, ry, rz);
                 Ray ray = new Ray(p, raydir);
@@ -260,24 +276,24 @@ final public class AO {
         }
 
         // [0.0, 1.0]
-        occlusion = (ntheta * nphi - occlusion) / (float)(ntheta * nphi);
+        occlusion = (ntheta * nphi - occlusion) / (double)(ntheta * nphi);
         return new Vec(occlusion, occlusion, occlusion);
     }
 
     void rowRender(int[] row, int width, int height, int y, int nsubsamples) {
         for (int x = 0; x < width; x++) {
-            float r = 0.0f;
-            float g = 0.0f;
-            float b = 0.0f;
+            double r = 0.0f;
+            double g = 0.0f;
+            double b = 0.0f;
 
             // subsampling
             for (int v = 0; v < nsubsamples; v++) {
                 for (int u = 0; u < nsubsamples; u++) {
-                    float px = (x + (u / (float)nsubsamples) - (width / 2.0f))/(width / 2.0f);
-                    float py = (y + (v / (float)nsubsamples) - (height / 2.0f))/(height / 2.0f);
+                    double px = (x + (u / (double)nsubsamples) - (width / 2.0f))/(width / 2.0f);
+                    double py = (y + (v / (double)nsubsamples) - (height / 2.0f))/(height / 2.0f);
                     py = -py;     // flip Y
 
-                    float t = 10000.0f;
+                    double t = 10000.0;
                     Vec eye = new Vec(px, py, -1.0f);
                     eye.normalize();
 
@@ -307,19 +323,19 @@ final public class AO {
 
     void generate(String fileName) throws IOException {
         int[] renderLine = new int[IMAGE_WIDTH * 3];
-
-        PrintWriter fout = new PrintWriter(new BufferedWriter(new FileWriter(fileName)));
-        fout.println("P3");
-        fout.println(IMAGE_WIDTH + " " + IMAGE_HEIGHT);
-        fout.println("255");
+        
+        FileOutputStream fout = new FileOutputStream(fileName);
+        fout.write("P6\n".getBytes());
+        fout.write((IMAGE_WIDTH + " " + IMAGE_HEIGHT+"\n").getBytes());
+        fout.write("255\n".getBytes());
 
         for (int y = 0; y < IMAGE_HEIGHT; y++) {
             rowRender(renderLine, IMAGE_WIDTH, IMAGE_HEIGHT, y, NSUBSAMPLES);
 
             for (int x = 0; x < (IMAGE_WIDTH * 3); x += 3) {
-                fout.print(renderLine[x + 0] + " ");
-                fout.print(renderLine[x + 1] + " ");
-                fout.println(renderLine[x + 2]);
+                fout.write((byte)(renderLine[x + 0]));
+                fout.write((byte)(renderLine[x + 1]));
+                fout.write((byte)(renderLine[x + 2]));
             }
         }
 
