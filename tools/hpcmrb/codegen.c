@@ -307,7 +307,13 @@ put_statement(hpc_codegen_context *c, HIR *stat)
       PUTS("continue;\n");
       return;
     case HIR_RETURN:
-      PUTS("return;\n");
+      if (stat->cdr) {
+        PUTS("return ");
+        put_symbol(c, CADR(stat));
+        PUTS(";\n");
+      } else {
+        PUTS("return;\n");
+      }
       return;
     default:
       NOT_REACHABLE();

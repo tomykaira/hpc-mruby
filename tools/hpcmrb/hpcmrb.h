@@ -33,7 +33,7 @@ enum hir_type {
   HIR_WHILE,      /* (:HIR_WHILE cond body) */
   HIR_BREAK,      /* (:HIR_BREAK) */
   HIR_CONTINUE,   /* (:HIR_CONTINUE) */
-  HIR_RETURN,     /* (:HIR_RETURN) */
+  HIR_RETURN,     /* (:HIR_RETURN) or (:HIR_RETURN val) */
 
   /* expressions */
   HIR_EMPTY,      /* (:HIR_EMPTY) */
