@@ -192,6 +192,18 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       }
       PUTS(")");
       return;
+    case HIR_INIT_LIST:
+      PUTS("{");
+      {
+        HIR *values = exp->cdr;
+        while (values) {
+          put_exp(c, values->car);
+          values = values->cdr;
+          if (values)
+            PUTS(", ");
+        }
+      }
+      PUTS("}");
     default:
       NOT_REACHABLE();
   }
