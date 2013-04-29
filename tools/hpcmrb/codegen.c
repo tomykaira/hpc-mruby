@@ -1,11 +1,10 @@
 #include "hpcmrb.h"
 #include <stdint.h>
 
-#if 0
-
 #define CADR(x) ((x)->cdr->car)
 #define CADDR(x) ((x)->cdr->cdr->car)
 #define CADDDR(x) ((x)->cdr->cdr->cdr->car)
+#define CADDDDR(x) ((x)->cdr->cdr->cdr->cdr->car)
 
 #define TYPE(x) ((intptr_t)((x)->car))
 #define DECLP(t) (t == HIR_GVARDECL || t == HIR_LVARDECL || \
@@ -23,6 +22,7 @@ typedef struct {
 } hpc_codegen_context;
 
 static void put_exp(hpc_codegen_context *c, HIR *exp);
+static void put_statement(hpc_codegen_context *c, HIR *stat);
 
 static void
 put_header(hpc_codegen_context *c)
@@ -36,11 +36,15 @@ put_header(hpc_codegen_context *c)
 static void
 put_type(hpc_codegen_context *c, HIR *kind)
 {
-  hpc_assert(TYPE(kind) == HIR_TYPE);
-
-  enum hir_type_kind k = (intptr_t)CADR(kind);
+  enum hir_type_kind k = (intptr_t)kind->car;
 
   switch (k) {
+    case HTYPE_VOID:
+      PUTS("void");
+    case HTYPE_VALUE:
+      PUTS("mrb_value");
+    case HTYPE_SYM:
+      PUTS("mrb_sym");
     case HTYPE_CHAR:
       PUTS("char");
       return;
@@ -58,13 +62,15 @@ put_type(hpc_codegen_context *c, HIR *kind)
       PUTS("char *");
       return;
     case HTYPE_PTR:
-      PUTS("void *");
+      put_type(c, CADR(kind));
+      PUTS(" *");
       return;
     case HTYPE_ARRAY:
-      PUTS("void **");
+    case HTYPE_FUNC:
+      NOT_REACHABLE();
       return;
     default:
-      NOT_IMPLEMENTED();
+      NOT_REACHABLE();
   }
 }
 
@@ -76,20 +82,44 @@ put_symbol(hpc_codegen_context *c, HIR *hir)
   PUTS(name);
 }
 
-/*
-  def ::= (:HIR_VAR symbol type)
-
-  Output:
-      int foo
- */
+/* Take two heads from hir as type and var */
 static void
-put_var_definition(hpc_codegen_context *c, HIR *def)
+put_variable(hpc_codegen_context *c, HIR *hir)
 {
-  hpc_assert(TYPE(def) == HIR_VAR);
+  HIR *type = hir->car;
+  enum hir_type_kind k = (intptr_t)type->car;
+  HIR *var = CADR(hir);
 
-  put_type(c, CADDR(def));
-  PUTS(" ");
-  put_symbol(c, CADR(def));
+  switch (k) {
+  case HTYPE_ARRAY:
+    {
+      int indices[1024];
+      int length, i;
+
+      /* link basetypes */
+      for (length = 0; TYPE(type) == HTYPE_ARRAY; length++) {
+        indices[length] = (intptr_t)CADDR(type);
+        type = CADR(type);
+      }
+      put_type(c, type);
+      PUTS(" ");
+      put_symbol(c, var);
+      for (i = 0; i <= length; i ++) {
+        char buf[32];
+        sprintf(buf, "[%d]", indices[i]);
+        PUTS(buf);
+      }
+    }
+    return;
+  case HTYPE_FUNC:
+    /* function pointer? */
+    NOT_IMPLEMENTED();
+  default:
+    put_type(c, type);
+    PUTS(" ");
+    put_symbol(c, var);
+    return;
+  }
 }
 
 static void
@@ -97,23 +127,38 @@ put_decl(hpc_codegen_context *c, HIR *decl)
 {
   switch (TYPE(decl)) {
     case HIR_GVARDECL:
-      put_var_definition(c, CADR(decl));
-      PUTS(" = ");
-      put_exp(c, CADDR(decl));
-      PUTS(";\n");
-      return;
     case HIR_LVARDECL:
-      put_var_definition(c, CADR(decl));
-      PUTS(" = ");
-      put_exp(c, CADDR(decl));
+      put_variable(c, decl->cdr);
+      if (TYPE(CADDR(decl)) != HIR_EMPTY) {
+        PUTS(" = ");
+        put_exp(c, CADDR(decl));
+      }
       PUTS(";\n");
       return;
     case HIR_PVARDECL:
-      put_var_definition(c, CADR(decl));
-      PUTS(";\n");
+      put_variable(c, decl->cdr);
       return;
     case HIR_FUNDECL:
-      NOT_IMPLEMENTED();
+      {
+        HIR *funtype = CADR(decl);
+        HIR *params = CADDDR(decl);
+        hpc_assert((intptr_t)funtype->car == HTYPE_FUNC);
+        put_type(c, CADR(funtype));
+        PUTS("\n");
+        put_symbol(c, CADDR(decl));
+        PUTS("(");
+        while (params) {
+          hpc_assert((intptr_t)params->car->car == HIR_PVARDECL);
+          put_decl(c, params->car);
+          params = params->cdr;
+          if (params) {
+            PUTS(", ");
+          }
+        }
+        put_statement(c, CADDDDR(decl));
+        PUTS(")\n");
+      }
+      return;
     default:
       NOT_REACHABLE();
   }
@@ -127,28 +172,15 @@ put_decl(hpc_codegen_context *c, HIR *decl)
 static void
 put_exp(hpc_codegen_context *c, HIR *exp)
 {
-  char buf[1024];
   switch (TYPE(exp)) {
     case HIR_EMPTY:
-      /* FIXME */
-      return;
+      NOT_REACHABLE();
     case HIR_INT:
-      sprintf(buf, "%d", (intptr_t)CADR(exp));
-      PUTS(buf);
-      return;
     case HIR_FLOAT:
-      {
-#ifdef MRB_USE_FLOAT
-        float *f = (float *)CADR(exp);
-        sprintf(buf, "%f", *f);
-#else
-        double *d = (double *)CADR(exp);
-        sprintf(buf, "%lf", *d);
-#endif
-        PUTS(buf);
-      }
+      PUTS((char *)CADR(exp));
       return;
-    case HIR_VAR:
+    case HIR_LVAR:
+    case HIR_GVAR:
       put_symbol(c, CADR(exp));
       return;
     case HIR_CALL:
@@ -170,6 +202,18 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       }
       PUTS(")");
       return;
+    case HIR_INIT_LIST:
+      PUTS("{");
+      {
+        HIR *values = exp->cdr;
+        while (values) {
+          put_exp(c, values->car);
+          values = values->cdr;
+          if (values)
+            PUTS(", ");
+        }
+      }
+      PUTS("}");
     default:
       NOT_REACHABLE();
   }
@@ -185,16 +229,28 @@ static void
 put_statement(hpc_codegen_context *c, HIR *stat)
 {
   switch (TYPE(stat)) {
+    case HIR_SCOPE:
+      {
+        /* FIXME: redundant {} when HIR_SCOPE has HIR_BLOCK as a child */
+        HIR *decls = CADR(stat);
+        HIR *inner_stat = stat->cdr->cdr;
+        PUTS("{\n");
+        INDENT_PP;
+        while (decls) {
+          put_decl(c, decls->car);
+          decls = decls->cdr;
+        }
+        PUTS("\n");
+        put_statement(c, inner_stat);
+        INDENT_MM;
+        PUTS("}\n");
+      }
+      return;
     case HIR_BLOCK:
       {
         HIR *stats = stat->cdr;
         PUTS("{\n");
         INDENT_PP;
-        while (DECLP(TYPE(stats))) {
-          put_decl(c, stats->car);
-          stats = stats->cdr;
-        }
-        PUTS("\n");
         while (stats) {
           put_statement(c, stats->car);
           stats = stats->cdr;
@@ -223,22 +279,19 @@ put_statement(hpc_codegen_context *c, HIR *stat)
       /* FIXME: expects
          - var is mrb_sym
          - var is defined at the top of this block
-         - low, high are int (TODO: it can be variable)
+         - low, high are exp
          - body is a statement
       */
       {
-        int low  = (intptr_t)CADDR(stat);
-        int high = (intptr_t)CADDDR(stat);
-        mrb_sym sym = (intptr_t)CADR(stat);
-        const char * var_name = mrb_sym2name(c->mrb, sym);
-        char buf[1024];
+        HIR *low  = CADDR(stat);
+        HIR *high = CADDDR(stat);
+        HIR *sym = CADR(stat);
 
-        hpc_assert(low <= high);
-
-        sprintf(buf, "for (%s = %d; %s < %d; %s++)",
-                var_name, low, var_name, high, var_name);
-        PUTS(buf);
-        put_statement(c, stat->cdr->cdr->cdr->cdr->car);
+        PUTS("for (");
+        put_symbol(c, sym); PUTS(" = "); put_exp(c, low); PUTS("; ");
+        put_symbol(c, sym); PUTS(" < "); put_exp(c, high); PUTS("; ");
+        puts("++"); put_symbol(c, sym); PUTS(")");
+        put_statement(c, CADDDDR(stat));
       }
       return;
     case HIR_WHILE:
@@ -261,12 +314,9 @@ put_statement(hpc_codegen_context *c, HIR *stat)
   }
 }
 
-#endif
-
 mrb_value
 hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
 {
-#if 0
   hpc_codegen_context c;
 
   puts("Generating C-program...");
@@ -281,7 +331,5 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   //  hir = hir->cdr;
   //}
 
-  return mrb_fixnum_value(0);
-#endif
   return mrb_fixnum_value(0);
 }

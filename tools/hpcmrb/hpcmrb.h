@@ -20,7 +20,7 @@ enum hir_type {
   HIR_GVARDECL,   /* (:HIR_GVARDECL type var value) */
   HIR_LVARDECL,   /* (:HIR_LVARDECL type var value) */
   HIR_PVARDECL,   /* (:HIR_PVARDECL type var) */
-  HIR_FUNDECL,    /* (:HIR_FUNDECL type sym params body (options...)) */
+  HIR_FUNDECL,    /* (:HIR_FUNDECL type sym (params...) body (options...)) */
 
   HIR_INIT_LIST,  /* (:HIR_INIT_LIST values...) */
 
