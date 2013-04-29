@@ -10,7 +10,6 @@ This version is designed to be fast with Psyco.
 """
 
 from math import sqrt, sin, cos, fabs
-from random import random
 from array import array
 
 try:
@@ -24,6 +23,21 @@ WIDTH = 256
 HEIGHT = WIDTH
 NSUBSAMPLES = 2
 NAO_SAMPLES = 8
+
+def rand():
+    t=rand.x ^ ((rand.x & 0xfffff) << 11);
+    rand.x = rand.y
+    rand.y = rand.z
+    rand.z = rand.w
+    rand.w = (rand.w ^ (rand.w >> 19) ^ (t ^ (t >> 8)))
+    BNUM = 1<<29
+    BNUMF = float(BNUM)
+    return (rand.w % BNUM) / BNUMF
+
+rand.x = 123456789
+rand.y = 362436069
+rand.z = 521288629
+rand.w = 88675123
 
 
 def vcross(v0, v1):
@@ -134,12 +148,12 @@ def ambient_occlusion(col, isect):
 
     for j in xrange(ntheta):
         for i in xrange(nphi):
-            theta = sqrt(random())
-            phi = 2.0 * 3.14159265358979323846 * random()
+            r = rand()
+            phi = 2.0 * 3.14159265 * rand()
 
-            x = cos(phi) * theta
-            y = sin(phi) * theta
-            z = sqrt(1.0 - theta * theta)
+            x = cos(phi) * sqrt(1.0 - r)
+            y = sin(phi) * sqrt(1.0 - r)
+            z = sqrt(r)
 
             # local -> global
             rx = x * b0[0] + y * b1[0] + z * b2[0]
