@@ -133,20 +133,8 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       /* FIXME */
       return;
     case HIR_INT:
-      sprintf(buf, "%d", (intptr_t)CADR(exp));
-      PUTS(buf);
-      return;
     case HIR_FLOAT:
-      {
-#ifdef MRB_USE_FLOAT
-        float *f = (float *)CADR(exp);
-        sprintf(buf, "%f", *f);
-#else
-        double *d = (double *)CADR(exp);
-        sprintf(buf, "%lf", *d);
-#endif
-        PUTS(buf);
-      }
+      PUTS((char *)CADR(exp));
       return;
     case HIR_LVAR:
     case HIR_GVAR:
