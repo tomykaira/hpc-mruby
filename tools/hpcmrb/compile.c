@@ -373,9 +373,76 @@ lat_join(mrb_state *mrb, mrb_value val1, mrb_value val2)
   }
 }
 
-/* Type analysis */
+/* Compiler main */
+
+typedef struct compiler_state {
+  mrb_state *mrb;
+  struct mrb_pool *pool;
+  HIR *cells;
+  short line;
+  jmp_buf jmp;
+} hpc_compiler_state;
+
+typedef hpc_compiler_state compiler_state;
+
+static void*
+compiler_palloc(compiler_state *p, size_t size)
+{
+  void *m = mrb_pool_alloc(p->pool, size);
+  if (!m) longjmp(p->jmp, 1);
+  return m;
+}
+
+static void
+cons_free_gen(compiler_state *p, HIR *cons)
+{
+  cons->cdr = p->cells;
+  p->cells = cons;
+}
+#define cons_free(c) cons_free_gen(p, (c))
+
+static HIR*
+cons_gen(compiler_state *p, HIR *car, HIR *cdr)
+{
+  HIR *c;
+  if (p->cells) {
+    c = p->cells;
+    p->cells = p->cells->cdr;
+  }
+  else {
+    c = (HIR *)compiler_palloc(p, sizeof(HIR));
+  }
+
+  c->car = car;
+  c->cdr = cdr;
+  c->lineno = 0;
+  return c;
+}
+#define cons(a,b) cons_gen(p, (a), (b))
+
+static compiler_state*
+compiler_state_new(mrb_state *mrb)
+{
+  mrb_pool *pool;
+  compiler_state *p;
+  static const compiler_state compiler_state_zero = { 0 };
+
+  pool = mrb_pool_open(mrb);
+  if (!pool) return 0;
+  p = (compiler_state*)mrb_pool_alloc(pool, sizeof(compiler_state));
+  if (!p) return 0;
+
+  *p = compiler_state_zero;
+  p->mrb = mrb;
+  p->pool = pool;
+  return p;
+}
+
 typedef mrb_ast_node node;
 typedef struct mrb_parser_state parser_state;
+
+void parser_dump(mrb_state *mrb, node *tree, int offset);
+
 
 enum looptype {
   LOOP_NORMAL,
@@ -476,9 +543,11 @@ scope_new(mrb_state *mrb, hpc_scope *prev, node *lv)
 }
 
 static HIR*
-compile(mrb_state *mrb, parser_state *p)
+compile(mrb_state *mrb, node *ast)
 {
   hpc_scope *scope = scope_new(mrb, 0, 0);
+
+  parser_dump(mrb, ast, 0);
 
   mrb_pool_close(scope->mpool);
   puts("compile: NOT IMPLEMENTED YET");
@@ -509,7 +578,9 @@ hpc_compile_file(mrb_state *mrb, FILE *rfp, mrbc_context *c)
       return 0;
     }
   }
-  return compile(mrb, p);
+  HIR *tree = compile(mrb, p->tree);
+  mrb_parser_free(p);
+  return tree;
 }
 
 void

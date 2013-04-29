@@ -11,9 +11,6 @@
 
 #define C_EXT ".c"
 
-void parser_dump(mrb_state*, struct mrb_ast_node*, int);
-void codedump_all(mrb_state*, int);
-
 struct _args {
   FILE *rfp;
   FILE *wfp;
