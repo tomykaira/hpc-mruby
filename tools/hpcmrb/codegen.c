@@ -109,6 +109,7 @@ put_variable(hpc_codegen_context *c, HIR *hir)
     put_type(c, type);
     PUTS(" ");
     put_symbol(c, var);
+    return;
   }
 }
 
