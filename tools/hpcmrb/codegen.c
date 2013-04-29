@@ -253,21 +253,19 @@ put_statement(hpc_codegen_context *c, HIR *stat)
       /* FIXME: expects
          - var is mrb_sym
          - var is defined at the top of this block
-         - low, high are int (TODO: it can be variable)
+         - low, high are exp
          - body is a statement
       */
       {
-        int low  = (intptr_t)CADDR(stat);
-        int high = (intptr_t)CADDDR(stat);
+        HIR *low  = CADDR(stat);
+        HIR *high = CADDDR(stat);
         mrb_sym sym = (intptr_t)CADR(stat);
-        const char * var_name = mrb_sym2name(c->mrb, sym);
         char buf[1024];
 
-        hpc_assert(low <= high);
-
-        sprintf(buf, "for (%s = %d; %s < %d; %s++)",
-                var_name, low, var_name, high, var_name);
-        PUTS(buf);
+        PUTS("for (");
+        put_symbol(c, sym); PUTS(" = "); put_exp(c, low); PUTS("; ");
+        put_symbol(c, sym); PUTS(" < "); put_exp(c, high); PUTS("; ");
+        puts("++"); put_symbol(c, sym); PUTS(")");
         put_statement(c, CADDDDR(stat));
       }
       return;
