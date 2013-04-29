@@ -715,6 +715,7 @@ typing(hpc_scope *s, node *tree)
           else
             last->cdr = cons(stmt, 0);
           last = stmt;
+          tree = tree->cdr;
         }
         return new_block(p, stmts);
       }
