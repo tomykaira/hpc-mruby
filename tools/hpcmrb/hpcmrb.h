@@ -56,7 +56,7 @@ enum hir_type_kind {
 
   HTYPE_PTR,      /* (:HTYPE_PTR basetype) */
   HTYPE_ARRAY,    /* (:HTYPE_ARRAY basetype len) */
-  HTYPE_FUNC,     /* (:HTYPE_FUNC ret params) */ /* params is list of HIR_LVAR */
+  HTYPE_FUNC,     /* (:HTYPE_FUNC ret params) */ /* params is list of HIR_PVARDECL */
 };
 
 enum hir_var_kind {
