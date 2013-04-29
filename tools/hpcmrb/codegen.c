@@ -1,8 +1,6 @@
 #include "hpcmrb.h"
 #include <stdint.h>
 
-#if 0
-
 #define CADR(x) ((x)->cdr->car)
 #define CADDR(x) ((x)->cdr->cdr->car)
 #define CADDDR(x) ((x)->cdr->cdr->cdr->car)
@@ -24,6 +22,7 @@ typedef struct {
 } hpc_codegen_context;
 
 static void put_exp(hpc_codegen_context *c, HIR *exp);
+static void put_statement(hpc_codegen_context *c, HIR *stat);
 
 static void
 put_header(hpc_codegen_context *c)
@@ -63,7 +62,7 @@ put_type(hpc_codegen_context *c, HIR *kind)
       PUTS("char *");
       return;
     case HTYPE_PTR:
-      put_type(CADR(kind));
+      put_type(c, CADR(kind));
       PUTS(" *");
       return;
     case HTYPE_ARRAY:
@@ -119,7 +118,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
   switch (TYPE(decl)) {
     case HIR_GVARDECL:
     case HIR_LVARDECL:
-      put_variable(decl->cdr);
+      put_variable(c, decl->cdr);
       if (TYPE(CADDR(decl)) != HIR_EMPTY) {
         PUTS(" = ");
         put_exp(c, CADDR(decl));
@@ -127,7 +126,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
       PUTS(";\n");
       return;
     case HIR_PVARDECL:
-      put_variable(decl->cdr);
+      put_variable(c, decl->cdr);
       return;
     case HIR_FUNDECL:
       {
@@ -136,7 +135,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
         hpc_assert((intptr_t)funtype->car == HTYPE_FUNC);
         put_type(c, CADR(funtype));
         PUTS("\n");
-        put_symbol(CADDR(decl));
+        put_symbol(c, CADDR(decl));
         PUTS("(");
         while (params) {
           hpc_assert((intptr_t)params->car->car == HIR_PVARDECL);
@@ -163,7 +162,6 @@ put_decl(hpc_codegen_context *c, HIR *decl)
 static void
 put_exp(hpc_codegen_context *c, HIR *exp)
 {
-  char buf[1024];
   switch (TYPE(exp)) {
     case HIR_EMPTY:
       NOT_REACHABLE();
@@ -265,8 +263,7 @@ put_statement(hpc_codegen_context *c, HIR *stat)
       {
         HIR *low  = CADDR(stat);
         HIR *high = CADDDR(stat);
-        mrb_sym sym = (intptr_t)CADR(stat);
-        char buf[1024];
+        HIR *sym = CADR(stat);
 
         PUTS("for (");
         put_symbol(c, sym); PUTS(" = "); put_exp(c, low); PUTS("; ");
@@ -295,12 +292,9 @@ put_statement(hpc_codegen_context *c, HIR *stat)
   }
 }
 
-#endif
-
 mrb_value
 hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
 {
-#if 0
   hpc_codegen_context c;
 
   puts("Generating C-program...");
@@ -315,7 +309,5 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   //  hir = hir->cdr;
   //}
 
-  return mrb_fixnum_value(0);
-#endif
   return mrb_fixnum_value(0);
 }
