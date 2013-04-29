@@ -17,10 +17,10 @@ extern "C" {
 /* High-level intermediate representation. */
 enum hir_type {
   /* declarations */
-  HIR_GVARDECL,   /* (:HIR_GVARDECL var value) */
-  HIR_LVARDECL,   /* (:HIR_LVARDECL var value) */
-  HIR_PVARDECL,   /* (:HIR_PVARDECL var) */
-  HIR_FUNDECL,    /* (:HIR_FUNDECL sym params body (options...)) */
+  HIR_GVARDECL,   /* (:HIR_GVARDECL type var value) */
+  HIR_LVARDECL,   /* (:HIR_LVARDECL type var value) */
+  HIR_PVARDECL,   /* (:HIR_PVARDECL type var) */
+  HIR_FUNDECL,    /* (:HIR_FUNDECL type sym params body (options...)) */
 
   HIR_INIT_LIST,  /* (:HIR_INIT_LIST values...) */
 
