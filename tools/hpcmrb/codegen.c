@@ -6,6 +6,7 @@
 #define CADR(x) ((x)->cdr->car)
 #define CADDR(x) ((x)->cdr->cdr->car)
 #define CADDDR(x) ((x)->cdr->cdr->cdr->car)
+#define CADDDDR(x) ((x)->cdr->cdr->cdr->cdr->car)
 
 #define TYPE(x) ((intptr_t)((x)->car))
 #define DECLP(t) (t == HIR_GVARDECL || t == HIR_LVARDECL || \
@@ -121,7 +122,26 @@ put_decl(hpc_codegen_context *c, HIR *decl)
       put_variable(decl->cdr);
       return;
     case HIR_FUNDECL:
-      NOT_IMPLEMENTED();
+      {
+        HIR *funtype = CADR(decl);
+        HIR *params = CADDDR(decl);
+        hpc_assert((intptr_t)funtype->car == HTYPE_FUNC);
+        put_type(c, CADR(funtype));
+        PUTS("\n");
+        put_symbol(CADDR(decl));
+        PUTS("(");
+        while (params) {
+          hpc_assert((intptr_t)params->car->car == HIR_PVARDECL);
+          put_decl(c, params->car);
+          params = params->cdr;
+          if (params) {
+            PUTS(", ");
+          }
+        }
+        put_statement(c, CADDDDR(decl));
+        PUTS(")\n");
+      }
+      return;
     default:
       NOT_REACHABLE();
   }
@@ -247,7 +267,7 @@ put_statement(hpc_codegen_context *c, HIR *stat)
         sprintf(buf, "for (%s = %d; %s < %d; %s++)",
                 var_name, low, var_name, high, var_name);
         PUTS(buf);
-        put_statement(c, stat->cdr->cdr->cdr->cdr->car);
+        put_statement(c, CADDDDR(stat));
       }
       return;
     case HIR_WHILE:
