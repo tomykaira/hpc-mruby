@@ -431,7 +431,7 @@ cons_gen(hpc_state *p, HIR *car, HIR *cdr)
   c->car = car;
   c->cdr = cdr;
   c->lineno = 0;
-  c->type = lat_unknown;
+  c->lat = lat_unknown;
   return c;
 }
 #define cons(a,b) cons_gen(p, (a), (b))
@@ -463,8 +463,14 @@ static HIR*
 new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 {
   HIR *var = cons((HIR*)HIR_LVAR, hirsym(sym));
-  var->type = lat;
+  var->lat = lat;
   return var;
+}
+
+static HIR*
+new_lvardecl(hpc_state *p, HIR *type, mrb_sym sym, HIR *val)
+{
+  return list4((HIR*)HIR_LVARDECL, type, hirsym(sym), val);
 }
 
 static HIR*
@@ -492,10 +498,18 @@ new_block(hpc_state *p, HIR *stmts)
 }
 
 static HIR*
+new_empty(hpc_state *p)
+{
+  HIR *hir = list1((HIR*)HIR_EMPTY);
+  hir->lat = mrb_nil_value();
+  return hir;
+}
+
+static HIR*
 new_int(hpc_state *p, char *text, int base, mrb_int val)
 {
   HIR *lit = list3((HIR*)HIR_INT, (HIR*)text, (HIR*)(intptr_t)base);
-  lit->type = mrb_fixnum_value(val);
+  lit->lat = mrb_fixnum_value(val);
   return lit;
 }
 
@@ -503,7 +517,7 @@ static HIR*
 new_float(hpc_state *p, char *text, int base, double val)
 {
   HIR *lit = list3((HIR*)HIR_FLOAT, (HIR*)text, (HIR*)(intptr_t)base);
-  lit->type = mrb_float_value(val);
+  lit->lat = mrb_float_value(val);
   return lit;
 }
 
@@ -563,6 +577,7 @@ typedef struct scope {
 
   struct scope *prev;
 
+  HIR *defs;
   HIR *lv;
   int sp;
 
@@ -699,6 +714,7 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv)
   s->prev = prev;
   s->ainfo = -1;
   s->mscope = 0;
+  s->defs = 0;
   s->lv = lv;
   s->sp += hir_len(lv) + 1;  /* +1 for self */
   s->nlocals = s->sp;
@@ -740,6 +756,13 @@ typing_scope(hpc_scope *s, node *tree)
 }
 
 static HIR*
+typing_call(hpc_scope *s, node *tree)
+{
+  HIR *recv = typing(s, tree->car);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
 typing(hpc_scope *s, node *tree)
 {
   if (!tree) return 0;
@@ -764,6 +787,8 @@ typing(hpc_scope *s, node *tree)
         }
         return new_block(p, stmts);
       }
+    case NODE_CALL:
+      return typing_call(s, tree);
     case NODE_INT:
       {
         char *txt = (char*)tree->car;
@@ -778,6 +803,10 @@ typing(hpc_scope *s, node *tree)
           return new_int(p, txt, base, i);
         }
       }
+    case NODE_DEF:
+      /* This node will be translated later using information of call-sites */
+      s->defs = cons((HIR*)tree, s->defs);
+      return new_empty(p);
     default:
       NOT_REACHABLE();
   }

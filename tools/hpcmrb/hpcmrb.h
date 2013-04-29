@@ -70,7 +70,7 @@ enum hir_var_kind {
 
 typedef struct HIR {
   struct HIR *car, *cdr;
-  mrb_value type;
+  mrb_value lat;
   short lineno;
 } HIR;
 
