@@ -158,8 +158,8 @@ put_decl(hpc_codegen_context *c, HIR *decl)
             PUTS(", ");
           }
         }
-        put_statement(c, CADDDDR(decl));
         PUTS(")\n");
+        put_statement(c, CADDDDR(decl));
       }
       return;
     default:
@@ -237,11 +237,13 @@ put_statement(hpc_codegen_context *c, HIR *stat)
         HIR *inner_stat = stat->cdr->cdr;
         PUTS("{\n");
         INDENT_PP;
-        while (decls) {
-          put_decl(c, decls->car);
-          decls = decls->cdr;
+        if (decls) {
+          while (decls) {
+            put_decl(c, decls->car);
+            decls = decls->cdr;
+          }
+          PUTS("\n");
         }
-        PUTS("\n");
         put_statement(c, inner_stat);
         INDENT_MM;
         PUTS("}\n");
