@@ -129,6 +129,44 @@ put_variable(hpc_codegen_context *c, HIR *hir)
 }
 
 static void
+put_function_name(hpc_codegen_context *c, HIR *sym)
+{
+  size_t len;
+  const char *name = mrb_sym2name_len(c->mrb, (mrb_sym)(intptr_t)sym, &len);
+
+  if (len == 1 && name[0] == '+')  {
+    PUTS("num_add");
+  }
+  else if (len == 1 && name[0] == '-')  {
+    PUTS("num_sub");
+  }
+  else if (len == 1 && name[0] == '*')  {
+    PUTS("num_mul");
+  }
+  else if (len == 1 && name[0] == '/')  {
+    PUTS("num_div");
+  }
+  else if (len == 1 && name[0] == '<')  {
+    PUTS("num_lt");
+  }
+  else if (len == 2 && name[0] == '<' && name[1] == '=')  {
+    PUTS("num_le");
+  }
+  else if (len == 1 && name[0] == '>')  {
+    PUTS("num_gt");
+  }
+  else if (len == 2 && name[0] == '>' && name[1] == '=')  {
+    PUTS("num_ge");
+  }
+  else if (len == 2 && name[0] == '=' && name[1] == '=')  {
+    PUTS("num_eq");
+  }
+  else {
+    put_symbol(c, sym);
+  }
+}
+
+static void
 put_decl(hpc_codegen_context *c, HIR *decl)
 {
   switch (TYPE(decl)) {
@@ -192,7 +230,7 @@ put_exp(hpc_codegen_context *c, HIR *exp)
          - func is symbol
          - args are expressions
        */
-      put_symbol(c, CADR(exp));
+      put_function_name(c, CADR(exp));
       PUTS("(");
       {
         HIR *args = exp->cdr->cdr;
