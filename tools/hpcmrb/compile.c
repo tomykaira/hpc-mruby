@@ -731,9 +731,6 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
   s->mrb = p->mrb;
   s->mpool = pool;
 
-  s->defs = 0;
-  s->inherit_defs = FALSE;
-
   if (!prev) return s;
 
   if (inherit_defs) {
@@ -944,10 +941,11 @@ compile(hpc_state *p, node *ast)
 
   funcdecls = cons(main_fun, 0);
   while (scope->defs) {
+    /* FIXME: it will not work for many defs */
     node *tree = (node *)scope->defs->car;
+    scope->defs = scope->defs->cdr;
     HIR *hir_tree = compile_def(p, scope, tree);
     funcdecls = cons(hir_tree, funcdecls);
-    scope->defs = scope->defs->cdr;
   }
 
   return funcdecls;
