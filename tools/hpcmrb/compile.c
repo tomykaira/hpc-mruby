@@ -522,6 +522,23 @@ new_float(hpc_state *p, char *text, int base, double val)
 }
 
 static HIR*
+new_ifelse(hpc_state *p, HIR* cond, HIR* ifthen, HIR* ifelse)
+{
+  
+  HIR *hir = list4((HIR*)HIR_IFELSE, cond, ifthen, ifelse);
+  hir->lat = lat_join(p->mrb, ifthen->lat, ifelse->lat);
+  return hir;
+}
+
+static HIR*
+new_return_value(hpc_state *p, HIR *exp)
+{
+  HIR *hir = list2((HIR*)HIR_RETURN, exp);
+  hir->lat = mrb_nil_value();
+  return hir;
+}
+
+static HIR*
 new_simple_type(hpc_state *p, enum hir_type_kind kind)
 {
   return list1((HIR*)kind);
@@ -769,6 +786,7 @@ typing(hpc_scope *s, node *tree)
   hpc_state *p = s->hpc;
   s->lineno = tree->lineno;
   int type = (intptr_t)tree->car;
+  parser_dump(p->mrb, tree, 0);
   tree = tree->cdr;
   switch (type) {
     case NODE_SCOPE:
@@ -788,6 +806,7 @@ typing(hpc_scope *s, node *tree)
         return new_block(p, stmts);
       }
     case NODE_CALL:
+    case NODE_FCALL:            /* when receiver is self */
       return typing_call(s, tree);
     case NODE_INT:
       {
@@ -807,6 +826,18 @@ typing(hpc_scope *s, node *tree)
       /* This node will be translated later using information of call-sites */
       s->defs = cons((HIR*)tree, s->defs);
       return new_empty(p);
+    case NODE_IF:
+      return new_ifelse(p,
+                        typing(s, tree->car),
+                        typing(s, tree->cdr->car),
+                        typing(s, tree->cdr->cdr->car));
+    case NODE_LVAR:
+      return new_lvar(p, sym(tree), lat_unknown);
+    case NODE_RETURN:
+      {
+        node *c = tree;
+        return new_return_value(p, typing(s, c));
+      }
     default:
       NOT_REACHABLE();
   }
