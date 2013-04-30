@@ -795,7 +795,7 @@ typing_call(hpc_scope *s, node *tree)
     while (argtree) {
       arg = typing(s, argtree->car);
       last->cdr = cons(arg, 0);
-      last = arg;
+      last = last->cdr;
       argtree = argtree->cdr;
     }
     /* block arg */
@@ -827,9 +827,10 @@ typing(hpc_scope *s, node *tree)
           stmt = typing(s, tree->car);
           if (!stmts)
             stmts = last = cons(stmt, 0);
-          else
+          else {
             last->cdr = cons(stmt, 0);
-          last = stmt;
+            last = last->cdr;
+          }
           tree = tree->cdr;
         }
         return new_block(p, stmts);
