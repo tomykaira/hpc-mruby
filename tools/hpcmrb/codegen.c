@@ -41,10 +41,13 @@ put_type(hpc_codegen_context *c, HIR *kind)
   switch (k) {
     case HTYPE_VOID:
       PUTS("void");
+      return;
     case HTYPE_VALUE:
       PUTS("mrb_value");
+      return;
     case HTYPE_SYM:
       PUTS("mrb_sym");
+      return;
     case HTYPE_CHAR:
       PUTS("char");
       return;
