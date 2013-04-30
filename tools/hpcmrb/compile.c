@@ -595,6 +595,7 @@ typedef struct scope {
   struct scope *prev;
 
   HIR *defs;
+  int inherit_defs;
   HIR *lv;
   int sp;
 
@@ -718,7 +719,7 @@ readint_mrb_int(hpc_scope *s, const char *p, int base, int neg, int *overflow)
 
 
 static hpc_scope*
-scope_new(hpc_state *p, hpc_scope *prev, HIR *lv)
+scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
 {
   static const hpc_scope hpc_scope_zero = { 0 };
   mrb_pool *pool = mrb_pool_open(p->mrb);
@@ -729,11 +730,20 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv)
   s->hpc = p;
   s->mrb = p->mrb;
   s->mpool = pool;
+
+  s->defs = 0;
+  s->inherit_defs = FALSE;
+
   if (!prev) return s;
+
+  if (inherit_defs) {
+    s->defs = prev->defs;
+  }
+  s->inherit_defs = inherit_defs;
+
   s->prev = prev;
   s->ainfo = -1;
   s->mscope = 0;
-  s->defs = 0;
   s->lv = lv;
   s->sp += hir_len(lv) + 1;  /* +1 for self */
   s->nlocals = s->sp;
@@ -752,8 +762,18 @@ static void
 scope_finish(hpc_scope *s)
 {
   mrb_state *mrb = s->mrb;
+  if (s->inherit_defs) {
+    s->prev->defs = s->defs;
+  }
   mrb_gc_arena_restore(mrb, s->ai);
   mrb_pool_close(s->mpool);
+}
+
+static void
+add_def(hpc_scope *s, node *tree)
+{
+  hpc_state *p = s->hpc;
+  s->defs = cons((HIR*)tree, s->defs);
 }
 
 static HIR *typing(hpc_scope *s, node *tree);
@@ -772,7 +792,7 @@ typing_scope(hpc_scope *s, node *tree)
     n = n->cdr;
   }
 
-  hpc_scope *scope = scope_new(p, s, lv);
+  hpc_scope *scope = scope_new(p, s, lv, TRUE);
   hir = new_scope(p, scope->lv, typing(scope, tree->cdr));
   scope_finish(scope);
   return hir;
@@ -854,7 +874,7 @@ typing(hpc_scope *s, node *tree)
       }
     case NODE_DEF:
       /* This node will be translated later using information of call-sites */
-      s->defs = cons((HIR*)tree, s->defs);
+      add_def(s, tree);
       return new_empty(p);
     case NODE_IF:
       return new_ifelse(p,
@@ -883,7 +903,7 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
   node *n_body = ast->cdr->cdr->cdr->car;
   HIR *params, *body, *last, *param;
   /* FIXME: what will be lv? */
-  hpc_scope *scope = scope_new(p, prev_scope, 0);
+  hpc_scope *scope = scope_new(p, prev_scope, 0, TRUE);
 
   /*
     TODO: - support other than mrb_value
@@ -911,7 +931,7 @@ static HIR*
 compile(hpc_state *p, node *ast)
 {
   HIR *funcdecls;
-  hpc_scope *scope = scope_new(p, 0, 0);
+  hpc_scope *scope = scope_new(p, 0, 0, FALSE);
   parser_dump(p->mrb, ast, 0);
   HIR *main_body = typing(scope, ast);
   mrb_pool_close(scope->mpool);
