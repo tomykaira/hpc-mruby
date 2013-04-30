@@ -332,7 +332,7 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   puts("Generating C-program...");
 
   c.mrb = s->mrb;
-  c.wfp = wfp;
+  c.wfp = stdout;
 
   put_header(&c);
   /* toplevel is declaration of compiled_main */
