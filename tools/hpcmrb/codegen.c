@@ -218,8 +218,14 @@ put_exp(hpc_codegen_context *c, HIR *exp)
 {
   switch (TYPE(exp)) {
     case HIR_INT:
-    case HIR_FLOAT:
+      PUTS("mrb_fixnum_value(");
       PUTS((char *)CADR(exp));
+      PUTS(")");
+      return;
+    case HIR_FLOAT:
+      PUTS("mrb_float_value(");
+      PUTS((char *)CADR(exp));
+      PUTS(")");
       return;
     case HIR_LVAR:
     case HIR_GVAR:
