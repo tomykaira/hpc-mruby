@@ -977,7 +977,7 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
           - optional and block args
   */
   /* TODO: define self type from scope->current_self->lat */
-  params = last = cons(new_pvardecl(p, value_type, scope->current_self->cdr), 0);
+  params = last = cons(new_pvardecl(p, value_type, sym(scope->current_self->cdr)), 0);
 
   while (mandatory_params) {
     param = new_pvardecl(p, value_type, sym(mandatory_params->car->cdr));
@@ -1002,7 +1002,7 @@ compile(hpc_state *p, node *ast)
   mrb_pool_close(scope->mpool);
 
   HIR *params = list2(
-      new_pvardecl(p, value_type, scope->current_self->cdr),
+      new_pvardecl(p, value_type, sym(scope->current_self->cdr)),
       new_pvardecl(p, mrb_state_ptr_type, mrb_intern(p->mrb, "mrb"))
       );
   HIR *main_fun = new_fundecl(p, mrb_intern(p->mrb, "compiled_main"),
