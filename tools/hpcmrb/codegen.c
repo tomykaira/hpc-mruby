@@ -290,7 +290,6 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
   switch (TYPE(stat)) {
     case HIR_SCOPE:
       {
-        /* FIXME: redundant {} when HIR_SCOPE has HIR_BLOCK as a child */
         HIR *decls = CADR(stat);
         HIR *inner_stat = stat->cdr->cdr;
         if (!no_brace) {
@@ -399,7 +398,6 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       }
       return;
     case HIR_EMPTY:
-      /* EMPTY occurs anywhere */
       return;
     case HIR_CALL:
       PUTS_INDENT;
@@ -423,16 +421,11 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   c.wfp = stdout;
 
   put_header(&c);
-  /* toplevel is BLOCK */
+  /* toplevel is a list of decls */
   while (hir) {
     put_decl(&c, hir->car);
     hir = hir->cdr;
   }
-
-  //while (hir) {
-  //  put_decl(fp, hir->car);
-  //  hir = hir->cdr;
-  //}
 
   return mrb_fixnum_value(0);
 }

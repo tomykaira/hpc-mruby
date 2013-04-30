@@ -986,7 +986,7 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
     mandatory_params = mandatory_params->cdr;
   }
 
-  /* how to inspect type? */
+  /* TODO: inspect return type? */
   return new_fundecl(p, name,
       new_func_type(p, value_type, params), params, body);
 }
@@ -1010,7 +1010,7 @@ compile(hpc_state *p, node *ast)
 
   funcdecls = cons(main_fun, 0);
   while (scope->defs) {
-    /* FIXME: it will not work for many defs */
+    /* FIXME: this management of defs possibly has bug */
     node *tree = (node *)scope->defs->car;
     scope->defs = scope->defs->cdr;
     HIR *hir_tree = compile_def(p, scope, tree);
