@@ -9,10 +9,11 @@ extern "C" {
 #include "mruby.h"
 #include "mruby/compile.h"
 #include <setjmp.h>
+#include <assert.h>
 
-#define NOT_IMPLEMENTED() mrb_bug("%s(%d): not implemented", __func__, __LINE__)
-#define NOT_REACHABLE()   mrb_bug("%s(%d): not reachable here", __func__, __LINE__)
-#define hpc_assert(cond)  do { if (!(cond)) { NOT_REACHABLE(); } } while(0)
+#define NOT_IMPLEMENTED() assert(0 && "not implemented")
+#define NOT_REACHABLE()   assert(0 && "not reachable")
+#define hpc_assert(cond)  assert(cond)
 
 /* High-level intermediate representation. */
 enum hir_type {
