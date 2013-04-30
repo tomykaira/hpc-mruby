@@ -538,6 +538,14 @@ static HIR*
 new_return_value(hpc_state *p, HIR *exp)
 {
   HIR *hir = list2((HIR*)HIR_RETURN, exp);
+  hir->lat = exp->lat;
+  return hir;
+}
+
+static HIR*
+new_return_void(hpc_state *p)
+{
+  HIR *hir = list1((HIR*)HIR_RETURN);
   hir->lat = mrb_nil_value();
   return hir;
 }
@@ -897,6 +905,60 @@ typing(hpc_scope *s, node *tree)
 }
 
 static HIR*
+insert_return_at_last(hpc_state *p, HIR *hir)
+{
+  switch ((intptr_t)hir->car) {
+  case HIR_INIT_LIST:
+  case HIR_GVARDECL:
+  case HIR_LVARDECL:
+  case HIR_PVARDECL:
+  case HIR_FUNDECL:
+    NOT_REACHABLE();
+    return hir;
+  case HIR_SCOPE:
+    hir->cdr->cdr = insert_return_at_last(p, hir->cdr->cdr);
+    return hir;
+  case HIR_BLOCK:
+    {
+      HIR *last = hir->cdr->car;
+      hpc_assert(last->cdr);
+      while (last->cdr)
+        last = last->cdr;
+      last->car = insert_return_at_last(p, last->car);
+    }
+    return hir;
+  case HIR_ASSIGN:
+    return new_block(p, list2(hir, new_return_value(p, new_lvar(p, sym(hir->cdr->car), hir->lat))));
+  case HIR_IFELSE:
+    hir->cdr->cdr->car = insert_return_at_last(p, hir->cdr->cdr->car);
+    hir->cdr->cdr->cdr->car = insert_return_at_last(p, hir->cdr->cdr->cdr->car);
+    return hir;
+  case HIR_DOALL:
+  case HIR_WHILE:
+    return new_block(p, list2(hir, new_return_void(p)));
+  case HIR_BREAK:
+  case HIR_CONTINUE:
+    NOT_REACHABLE();
+  case HIR_RETURN:
+    return hir;
+  case HIR_EMPTY:
+    return new_return_void(p);
+  case HIR_INT:
+    return new_return_value(p, hir);
+  case HIR_FLOAT:
+    return new_return_value(p, hir);
+  case HIR_LVAR:
+    return new_return_value(p, hir);
+  case HIR_GVAR:
+    return new_return_value(p, hir);
+  case HIR_CALL:
+    return new_return_value(p, hir);
+  default:
+    NOT_IMPLEMENTED();
+  }
+}
+
+static HIR*
 compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
 {
   mrb_sym name = sym(ast->car);
@@ -907,6 +969,7 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
   hpc_scope *scope = scope_new(p, prev_scope, 0, TRUE);
 
   body = typing(scope, n_body);
+  body = insert_return_at_last(p, body);
 
   /*
     args
