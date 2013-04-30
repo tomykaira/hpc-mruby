@@ -735,6 +735,9 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
   s->mrb = p->mrb;
   s->mpool = pool;
 
+  s->current_self = cons((HIR*)HIR_LVAR, hirsym(mrb_intern_cstr(p->mrb, "__self__")));
+  s->current_self->lat = lat_unknown;
+
   if (!prev) return s;
 
   if (inherit_defs) {
@@ -752,9 +755,6 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
 
   s->filename = prev->filename;
   s->lineno = prev->lineno;
-
-  s->current_self = cons((HIR*)HIR_LVAR, hirsym(mrb_intern_cstr(p->mrb, "__self__")));
-  s->current_self->lat = lat_unknown;
 
   return s;
 }
@@ -902,26 +902,27 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
   mrb_sym name = sym(ast->car);
   node *mandatory_params = ast->cdr->cdr->car->car;
   node *n_body = ast->cdr->cdr->cdr->car;
-  HIR *params, *body, *last, *param;
+  HIR *params = 0, *body, *last, *param;
   /* FIXME: what will be lv? */
   hpc_scope *scope = scope_new(p, prev_scope, 0, TRUE);
 
+  body = typing(scope, n_body);
+
   /*
-    TODO: - support other than mrb_value
+    args
+    TODO: - support other than mrb_value (using info in scope)
           - optional and block args
   */
+  /* TODO: define self type from scope->current_self->lat */
+  params = last = cons(new_pvardecl(p, value_type, scope->current_self->cdr), 0);
+
   while (mandatory_params) {
-    param = new_pvardecl(p, value_type, sym(mandatory_params->car));
-    if (!params)
-      params = last = cons(param, 0);
-    else {
-      last->cdr = cons(param, 0);
-      last = last->cdr;
-    }
+    param = new_pvardecl(p, value_type, sym(mandatory_params->car->cdr));
+    last->cdr = cons(param, 0);
+    last = last->cdr;
     mandatory_params = mandatory_params->cdr;
   }
 
-  body = typing(scope, n_body);
   /* how to inspect type? */
   return new_fundecl(p, name,
       new_func_type(p, value_type, params), params, body);
@@ -937,7 +938,8 @@ compile(hpc_state *p, node *ast)
   HIR *main_body = typing(scope, ast);
   mrb_pool_close(scope->mpool);
 
-  HIR *params = list1(
+  HIR *params = list2(
+      new_pvardecl(p, value_type, scope->current_self->cdr),
       new_pvardecl(p, mrb_state_ptr_type, mrb_intern(p->mrb, "mrb"))
       );
   HIR *main_fun = new_fundecl(p, mrb_intern(p->mrb, "compiled_main"),
