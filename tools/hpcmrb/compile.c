@@ -876,8 +876,41 @@ typing(hpc_scope *s, node *tree)
 }
 
 static HIR*
+compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
+{
+  mrb_sym name = sym(ast->car);
+  node *mandatory_params = ast->cdr->cdr->car->car;
+  node *n_body = ast->cdr->cdr->cdr->car;
+  HIR *params, *body, *last, *param;
+  /* FIXME: what will be lv? */
+  hpc_scope *scope = scope_new(p, prev_scope, 0);
+
+  /*
+    TODO: - support other than mrb_value
+          - optional and block args
+  */
+  while (mandatory_params) {
+    param = new_pvardecl(p, value_type, sym(mandatory_params->car));
+    if (!params)
+      params = last = cons(param, 0);
+    else {
+      last->cdr = cons(param, 0);
+      last = last->cdr;
+    }
+    mandatory_params = mandatory_params->cdr;
+  }
+
+  body = typing(scope, n_body);
+  /* how to inspect type? */
+  return new_fundecl(p, name,
+      new_func_type(p, value_type, params), params, body);
+}
+
+/* return a raw list of decls (fundecl, global decl) */
+static HIR*
 compile(hpc_state *p, node *ast)
 {
+  HIR *funcdecls;
   hpc_scope *scope = scope_new(p, 0, 0);
   parser_dump(p->mrb, ast, 0);
   HIR *main_body = typing(scope, ast);
@@ -886,8 +919,18 @@ compile(hpc_state *p, node *ast)
   HIR *params = list1(
       new_pvardecl(p, mrb_state_ptr_type, mrb_intern(p->mrb, "mrb"))
       );
-  return new_fundecl(p, mrb_intern(p->mrb, "compiled_main"),
+  HIR *main_fun = new_fundecl(p, mrb_intern(p->mrb, "compiled_main"),
       new_func_type(p, void_type, params), params, main_body);
+
+  funcdecls = cons(main_fun, 0);
+  while (scope->defs) {
+    node *tree = (node *)scope->defs->car;
+    HIR *hir_tree = compile_def(p, scope, tree);
+    funcdecls = cons(hir_tree, funcdecls);
+    scope->defs = scope->defs->cdr;
+  }
+
+  return funcdecls;
 }
 
 HIR*
@@ -916,9 +959,9 @@ hpc_compile_file(hpc_state *s, FILE *rfp, mrbc_context *c)
       return 0;
     }
   }
-  HIR *tree = compile(s, p->tree);
+
   mrb_parser_free(p);
-  return tree;
+  return compile(s, p->tree);
 }
 
 void
