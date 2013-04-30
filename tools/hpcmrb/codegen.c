@@ -182,7 +182,7 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       return;
     case HIR_LVAR:
     case HIR_GVAR:
-      put_symbol(c, CADR(exp));
+      put_symbol(c, exp->cdr);
       return;
     case HIR_CALL:
       /* FIXME: expects
