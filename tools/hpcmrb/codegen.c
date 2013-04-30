@@ -331,6 +331,8 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   c.wfp = wfp;
 
   put_header(&c);
+  /* toplevel is declaration of compiled_main */
+  put_decl(&c, hir);
 
   //while (hir) {
   //  put_decl(fp, hir->car);
