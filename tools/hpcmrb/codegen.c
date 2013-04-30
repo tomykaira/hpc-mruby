@@ -249,7 +249,7 @@ put_statement(hpc_codegen_context *c, HIR *stat)
       return;
     case HIR_BLOCK:
       {
-        HIR *stats = stat->cdr;
+        HIR *stats = stat->cdr->car;
         PUTS("{\n");
         INDENT_PP;
         while (stats) {
