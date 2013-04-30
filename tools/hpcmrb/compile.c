@@ -612,6 +612,8 @@ typedef struct scope {
   int nlocals;
 
   int ai;
+
+  HIR *current_self;
 } hpc_scope;
 
 static int
@@ -739,6 +741,10 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv)
 
   s->filename = prev->filename;
   s->lineno = prev->lineno;
+
+  s->current_self = cons((HIR*)HIR_LVAR, hirsym(mrb_intern_cstr(p->mrb, "__self__")));
+  s->current_self->lat = lat_unknown;
+
   return s;
 }
 
@@ -856,6 +862,8 @@ typing(hpc_scope *s, node *tree)
                         typing(s, tree->cdr->cdr->car));
     case NODE_LVAR:
       return new_lvar(p, sym(tree), lat_unknown);
+    case NODE_SELF:
+      return s->current_self;
     case NODE_RETURN:
       {
         node *c = tree;
