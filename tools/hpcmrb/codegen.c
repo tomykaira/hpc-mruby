@@ -321,6 +321,10 @@ put_statement(hpc_codegen_context *c, HIR *stat)
     case HIR_EMPTY:
       /* EMPTY occurs anywhere */
       return;
+    case HIR_CALL:
+      put_exp(c, stat);
+      PUTS(";\n");
+      return;
     default:
       NOT_REACHABLE();
   }
