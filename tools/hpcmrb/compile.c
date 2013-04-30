@@ -526,7 +526,11 @@ new_ifelse(hpc_state *p, HIR* cond, HIR* ifthen, HIR* ifelse)
 {
   
   HIR *hir = list4((HIR*)HIR_IFELSE, cond, ifthen, ifelse);
-  hir->lat = lat_join(p->mrb, ifthen->lat, ifelse->lat);
+  if (ifelse) {
+    hir->lat = lat_join(p->mrb, ifthen->lat, ifelse->lat);
+  } else {
+    hir->lat = lat_clone(p->mrb, ifthen->lat);
+  }
   return hir;
 }
 
