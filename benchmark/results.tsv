@@ -29,3 +29,14 @@ fib39	tikuta_tikuta-Latitude-E5410	scheme	10.98
 fib39	tikuta_tikuta-Latitude-E5410	lua	15.96
 fib39	tikuta_tikuta-Latitude-E5410	luajit	1.25
 fib39	tikuta_tikuta-Latitude-E5410	scala	0.77
+ao-render	tikuta_tikuta-Latitude-E5410	c	1.18
+ao-render	tikuta_tikuta-Latitude-E5410	java	2.07
+ao-render	tikuta_tikuta-Latitude-E5410	python-2.7.4	116.59
+ao-render	tikuta_tikuta-Latitude-E5410	python-3.3.1	127.79
+ao-render	tikuta_tikuta-Latitude-E5410	python-jython-2.5.3	90.60
+ao-render	tikuta_tikuta-Latitude-E5410	python-pypy-1.9	7.41
+ao-render	tikuta_tikuta-Latitude-E5410	ruby-1.9.3-p392	368.96
+ao-render	tikuta_tikuta-Latitude-E5410	ruby-2.0.0-p0	309.81
+ao-render	tikuta_tikuta-Latitude-E5410	ruby-jruby-1.7.3	82.14
+ao-render	tikuta_tikuta-Latitude-E5410	ruby-rbx-2.0.0-rc1	169.34
+ao-render	tikuta_tikuta-Latitude-E5410	ruby-topaz-dev	26.17
