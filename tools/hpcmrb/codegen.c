@@ -309,7 +309,7 @@ put_statement(hpc_codegen_context *c, HIR *stat)
     case HIR_RETURN:
       if (stat->cdr) {
         PUTS("return ");
-        put_symbol(c, CADR(stat));
+        put_exp(c, CADR(stat));
         PUTS(";\n");
       } else {
         PUTS("return;\n");
