@@ -146,8 +146,8 @@ def ambient_occlusion(col, isect):
     b1 = basis[1]
     b2 = basis[2]
 
-    for j in xrange(ntheta):
-        for i in xrange(nphi):
+    for j in range(ntheta):
+        for i in range(nphi):
             r = rand()
             phi = 2.0 * 3.14159265 * rand()
 
@@ -196,14 +196,14 @@ def render(w, h, nsubsamples):
     w2 = w / 2.0
     h2 = h / 2.0
 
-    for y in xrange(h):
-        for x in xrange(w):
+    for y in range(h):
+        for x in range(w):
             fr = 0.0
             fg = 0.0
             fb = 0.0
 
-            for v in xrange(nsubsamples):
-                for u in xrange(nsubsamples):
+            for v in range(nsubsamples):
+                for u in range(nsubsamples):
                     px = (x + (u / nsubs) - w2) / w2
                     py = -1 * (y + (v / nsubs) - h2) / h2
                     ray0 = [0.0, 0.0, 0.0]
@@ -240,9 +240,9 @@ def init_scene():
 
 def save_ppm(img, w, h, fname):
     fout = open(fname, "wb")
-    print >>fout, "P6"
-    print >>fout, "%i %i" % (w, h)
-    print >>fout, "255"
+    fout.write(("P6\n").encode('utf-8'))
+    fout.write(("%i %i\n" % (w, h)).encode('utf-8'))
+    fout.write(("255\n").encode('utf-8'))
     array("B", img).tofile(fout)
     fout.close()
 
