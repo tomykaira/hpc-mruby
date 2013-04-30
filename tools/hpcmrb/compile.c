@@ -776,7 +776,30 @@ static HIR*
 typing_call(hpc_scope *s, node *tree)
 {
   HIR *recv = typing(s, tree->car);
-  NOT_IMPLEMENTED();
+  mrb_sym name = sym(tree->cdr->car);
+  hpc_state *p = s->hpc;
+  HIR *args, *last, *arg;
+  tree = tree->cdr->cdr->car;
+
+  arg = recv;
+  args = last = cons(arg, 0);
+
+  if (tree) {
+    node *argtree = tree->car;
+    while (argtree) {
+      arg = typing(s, argtree->car);
+      last->cdr = cons(arg, 0);
+      last = arg;
+      argtree = argtree->cdr;
+    }
+    /* block arg */
+    if (tree->cdr) {
+      NOT_IMPLEMENTED();
+    }
+  }
+  
+
+  return cons((HIR*)HIR_CALL, cons(hirsym(name), args));
 }
 
 static HIR*
