@@ -480,9 +480,9 @@ new_pvardecl(hpc_state *p, HIR *type, mrb_sym sym)
 }
 
 static HIR*
-new_fundecl(hpc_state *p, mrb_sym sym, HIR *params, HIR *body, HIR *type)
+new_fundecl(hpc_state *p, mrb_sym sym, HIR *type, HIR *params, HIR *body)
 {
-  return list5((HIR*)HIR_FUNDECL, hirsym(sym), params, body, type);
+  return list5((HIR*)HIR_FUNDECL, type, hirsym(sym), params, body);
 }
 
 static HIR*
