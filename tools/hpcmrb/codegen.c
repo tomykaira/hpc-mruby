@@ -73,7 +73,7 @@ put_type(hpc_codegen_context *c, HIR *kind)
       NOT_REACHABLE();
       return;
     case HTYPE_TYPEDEF:
-      PUTS(kind->cdr->car);
+      PUTS((char *)kind->cdr->car);
       return;
     default:
       NOT_REACHABLE();
