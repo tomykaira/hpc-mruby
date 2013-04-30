@@ -274,6 +274,7 @@ put_statement(hpc_codegen_context *c, HIR *stat)
       return;
     case HIR_IFELSE:
       PUTS("if (");
+      put_exp(c, CADR(stat));
       PUTS(")");
       put_statement(c, CADDR(stat));
       if (CADDDR(stat)) {
