@@ -524,7 +524,7 @@ new_float(hpc_state *p, char *text, int base, double val)
 static HIR*
 new_ifelse(hpc_state *p, HIR* cond, HIR* ifthen, HIR* ifelse)
 {
-  
+
   HIR *hir = list4((HIR*)HIR_IFELSE, cond, ifthen, ifelse);
   if (ifelse) {
     hir->lat = lat_join(p->mrb, ifthen->lat, ifelse->lat);
@@ -824,7 +824,7 @@ typing_call(hpc_scope *s, node *tree)
       NOT_IMPLEMENTED();
     }
   }
-  
+
 
   return cons((HIR*)HIR_CALL, cons(hirsym(name), args));
 }
