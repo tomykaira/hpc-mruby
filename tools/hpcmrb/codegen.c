@@ -176,8 +176,6 @@ static void
 put_exp(hpc_codegen_context *c, HIR *exp)
 {
   switch (TYPE(exp)) {
-    case HIR_EMPTY:
-      NOT_REACHABLE();
     case HIR_INT:
     case HIR_FLOAT:
       PUTS((char *)CADR(exp));
@@ -317,6 +315,9 @@ put_statement(hpc_codegen_context *c, HIR *stat)
       } else {
         PUTS("return;\n");
       }
+      return;
+    case HIR_EMPTY:
+      /* EMPTY occurs anywhere */
       return;
     default:
       NOT_REACHABLE();
