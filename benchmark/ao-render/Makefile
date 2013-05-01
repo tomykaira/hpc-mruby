@@ -1,4 +1,4 @@
-.PHONY: all c java python ruby groovy \
+.PHONY: all c java python ruby groovy haskell ocaml ocamlopt \
 clean
 
 RUBY_TARGETS=1.9.3-p392 2.0.0-p0 jruby-1.7.3 rbx-2.0.0-rc1 topaz-dev
@@ -40,6 +40,21 @@ ruby: ao-render.rb
 	  fi; \
 	done
 	rm ao_rb.ppm
+
+ocaml: ao_ml.ml
+	ocamlc ao_ml.ml -o ml.out
+	${TIME} $@ ./ml.out
+	rm ao.ppm
+
+ocamlopt: ao_ml.ml
+	ocamlopt ao_ml.ml -o ml.out
+	${TIME} $@ ./ml.out
+	rm ao.ppm
+
+haskell: ao_hs.hs
+	ghc --make -O3 ao_hs.hs -o hs.out
+	${TIME} $@ ./hs.out > ao_hs.ppm
+	rm ao_hs.ppm
 
 clean:
 	rm -rf *.out *.cmi *.cmo *.cmx *.class .rbx *.hi *.o
