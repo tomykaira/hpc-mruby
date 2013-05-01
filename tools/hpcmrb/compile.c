@@ -82,7 +82,9 @@ lat_inspect(mrb_state *mrb, mrb_value lat)
         }
         return mrb_str_buf_cat(mrb, buf, "}", 1);
       }
-    /* LAT_CONST is not of Lattice class */
+    /* LAT_CONST is not of Lattice class, but for pretty printing */
+    case LAT_CONST:
+      return mrb_any_to_s(mrb, lat);
     default:
       break;
   }
