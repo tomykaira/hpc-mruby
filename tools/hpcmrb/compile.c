@@ -844,7 +844,6 @@ typing(hpc_scope *s, node *tree)
   hpc_state *p = s->hpc;
   s->lineno = tree->lineno;
   int type = (intptr_t)tree->car;
-  parser_dump(p->mrb, tree, 0);
   tree = tree->cdr;
   switch (type) {
     case NODE_SCOPE:
