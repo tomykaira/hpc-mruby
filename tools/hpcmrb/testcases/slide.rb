@@ -1,2 +1,2 @@
-a = rand() * b
+a = rand() * 10
 puts a
