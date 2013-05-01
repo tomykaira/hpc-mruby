@@ -80,6 +80,7 @@ typedef struct hpc_state {
   struct mrb_pool *pool;
   HIR *decls;
   HIR *cells;
+  HIR *gvars;                   /* found global variables */
   short line;
   jmp_buf jmp;
 } hpc_state;

@@ -468,9 +468,23 @@ new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 }
 
 static HIR*
+new_gvar(hpc_state *p, mrb_sym sym, mrb_value lat)
+{
+  HIR *var = cons((HIR*)HIR_GVAR, hirsym(sym));
+  var->lat = lat;
+  return var;
+}
+
+static HIR*
 new_lvardecl(hpc_state *p, HIR *type, mrb_sym sym, HIR *val)
 {
   return list4((HIR*)HIR_LVARDECL, type, hirsym(sym), val);
+}
+
+static HIR*
+new_gvardecl(hpc_state *p, HIR *type, mrb_sym sym, HIR *val)
+{
+  return list4((HIR*)HIR_GVARDECL, type, hirsym(sym), val);
 }
 
 static HIR*
@@ -817,6 +831,22 @@ lvs_to_decls(hpc_scope *s, HIR *lvs)
   return lv_decls;
 }
 
+/*
+  list: list of HIR_GVAR or HIR_LVAR
+  return: 0 if not found
+ */
+static HIR*
+find_var_list(hpc_state *p, HIR *list, mrb_sym needle)
+{
+  while (list) {
+    if (sym(list->car->cdr) == needle) {
+      return list->car;
+    }
+    list = list->cdr;
+  }
+  return 0;
+}
+
 static HIR*
 typing_scope(hpc_scope *s, node *tree)
 {
@@ -930,6 +960,15 @@ typing(hpc_scope *s, node *tree)
       }
     case NODE_ASGN:
       return new_assign(p, typing(s, tree->car), typing(s, tree->cdr));
+    case NODE_GVAR:
+      {
+        HIR *gvar = find_var_list(p, p->gvars, sym(tree));
+        if (!gvar) {
+          gvar = new_gvar(p, sym(tree), lat_unknown);
+          p->gvars = cons(gvar, p->gvars);
+        }
+        return gvar;
+      }
     default:
       NOT_REACHABLE();
   }
@@ -1026,7 +1065,7 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
 static HIR*
 compile(hpc_state *p, node *ast)
 {
-  HIR *funcdecls;
+  HIR *topdecls;
   hpc_scope *scope = scope_new(p, 0, 0, FALSE);
   parser_dump(p->mrb, ast, 0);
   HIR *main_body = typing(scope, ast);
@@ -1039,16 +1078,24 @@ compile(hpc_state *p, node *ast)
   HIR *main_fun = new_fundecl(p, mrb_intern(p->mrb, "compiled_main"),
       new_func_type(p, void_type, params), params, main_body);
 
-  funcdecls = cons(main_fun, 0);
+  topdecls = cons(main_fun, 0);
+
   while (scope->defs) {
     /* FIXME: this management of defs possibly has bug */
     node *tree = (node *)scope->defs->car;
     scope->defs = scope->defs->cdr;
     HIR *hir_tree = compile_def(p, scope, tree);
-    funcdecls = cons(hir_tree, funcdecls);
+    topdecls = cons(hir_tree, topdecls);
   }
 
-  return funcdecls;
+  while (p->gvars) {
+    HIR *gvar = p->gvars->car;
+    topdecls = cons(new_gvardecl(p, infer_type(p, gvar->lat), sym(gvar->cdr), new_empty(p)),
+                    topdecls);
+    p->gvars = p->gvars->cdr;
+  }
+
+  return topdecls;
 }
 
 HIR*
