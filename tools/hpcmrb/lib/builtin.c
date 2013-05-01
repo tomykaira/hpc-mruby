@@ -91,7 +91,7 @@ num_subi(mrb_value a, mrb_int b)
       x = mrb_fixnum(a);
       y = b;
       z = x - y;
-      if (((x < 0) ^ (y < 0)) != 0 && (x < 0) != (z < 0)) {      
+      if (((x < 0) ^ (y < 0)) != 0 && (x < 0) != (z < 0)) {
         /* integer overflow */
         return mrb_float_value((mrb_float)x - (mrb_float)y);
       }
