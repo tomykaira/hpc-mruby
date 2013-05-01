@@ -551,6 +551,14 @@ new_return_void(hpc_state *p)
 }
 
 static HIR*
+new_assign(hpc_state *p, HIR *lhs, HIR *rhs)
+{
+  HIR *hir = list3((HIR*)HIR_ASSIGN, lhs, rhs);
+  hir->lat = rhs->lat;
+  return hir;
+}
+
+static HIR*
 new_simple_type(hpc_state *p, enum hir_type_kind kind)
 {
   return list1((HIR*)kind);
@@ -788,6 +796,28 @@ add_def(hpc_scope *s, node *tree)
 static HIR *typing(hpc_scope *s, node *tree);
 
 static HIR*
+infer_type(hpc_state *p, mrb_value lat)
+{
+  /* TODO: infer type from lattice */
+  return value_type;
+}
+
+static HIR*
+lvs_to_decls(hpc_scope *s, HIR *lvs)
+{
+  HIR *lv_decls = 0;
+  hpc_state *p = s->hpc;
+
+  while (lvs) {
+    mrb_sym sym = sym(lvs->car->cdr);
+    lv_decls = cons(new_lvardecl(p, infer_type(p, lvs->car->lat), sym, new_empty(p)), lv_decls);
+    lvs = lvs->cdr;
+  }
+
+  return lv_decls;
+}
+
+static HIR*
 typing_scope(hpc_scope *s, node *tree)
 {
   HIR* hir;
@@ -802,7 +832,7 @@ typing_scope(hpc_scope *s, node *tree)
   }
 
   hpc_scope *scope = scope_new(p, s, lv, TRUE);
-  hir = new_scope(p, scope->lv, typing(scope, tree->cdr));
+  hir = new_scope(p, lvs_to_decls(scope, scope->lv), typing(scope, tree->cdr));
   scope_finish(scope);
   return hir;
 }
@@ -898,6 +928,8 @@ typing(hpc_scope *s, node *tree)
         node *c = tree;
         return new_return_value(p, typing(s, c));
       }
+    case NODE_ASGN:
+      return new_assign(p, typing(s, tree->car), typing(s, tree->cdr));
     default:
       NOT_REACHABLE();
   }

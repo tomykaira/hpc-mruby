@@ -180,9 +180,9 @@ put_decl(hpc_codegen_context *c, HIR *decl)
     case HIR_GVARDECL:
     case HIR_LVARDECL:
       put_variable(c, decl->cdr);
-      if (TYPE(CADDR(decl)) != HIR_EMPTY) {
+      if (TYPE(CADDDR(decl)) != HIR_EMPTY) {
         PUTS(" = ");
-        put_exp(c, CADDR(decl));
+        put_exp(c, CADDDR(decl));
       }
       PUTS(";\n");
       return;
@@ -332,9 +332,10 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       }
       return;
     case HIR_ASSIGN:
-      /* FIXME: assuming that lhs is sym, rhs is exp */
+      /* lhs is HIR_LVAR or HIR_GVAR,
+         rhs is exp */
       PUTS_INDENT;
-      put_symbol(c, CADR(stat));
+      put_symbol(c, CADR(stat)->cdr);
       PUTS(" = ");
       put_exp(c, CADDR(stat));
       PUTS(";\n");
