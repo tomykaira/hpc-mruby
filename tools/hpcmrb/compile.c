@@ -570,6 +570,7 @@ static HIR*
 new_assign(hpc_state *p, HIR *lhs, HIR *rhs)
 {
   HIR *hir = list3((HIR*)HIR_ASSIGN, lhs, rhs);
+  lhs->lat = lat_join(p->mrb, lhs->lat, rhs->lat); /* FIXME: bug here */
   hir->lat = rhs->lat;
   return hir;
 }
