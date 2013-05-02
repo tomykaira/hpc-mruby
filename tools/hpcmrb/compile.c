@@ -2,6 +2,7 @@
 #include <string.h>
 #include "hpcmrb.h"
 #include "mruby/array.h"
+#include "mruby/class.h"
 #include "mruby/data.h"
 #include "mruby/string.h"
 #include "node.h"
@@ -743,8 +744,8 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
   s->mrb = p->mrb;
   s->mpool = pool;
 
-  s->current_self = cons((HIR*)HIR_LVAR, hirsym(mrb_intern_cstr(p->mrb, "__self__")));
-  s->current_self->lat = lat_unknown;
+  s->current_self = new_lvar(p, mrb_intern_cstr(p->mrb, "__self__"),
+      mrb_top_self(p->mrb));
 
   if (!prev) return s;
 
@@ -808,9 +809,64 @@ typing_scope(hpc_scope *s, node *tree)
 }
 
 static HIR*
+typing_args(hpc_scope *s, node *args)
+{
+  int n = 0;
+  HIR *hir = 0, *last = 0;
+  hpc_state *p = s->hpc;
+  while (args) {
+    if (n >= 127 || (intptr_t)args->car->car == NODE_SPLAT) {
+      /* splat mode */
+      NOT_IMPLEMENTED();
+    }
+    /* normal mode */
+
+    if (hir)
+      last->cdr = cons(typing(s, args->car), 0);
+    else
+      hir = last = cons(typing(s, args->car), 0);
+    n++;
+    args = args->cdr;
+  }
+  return hir;
+}
+
+static HIR*
+typing_call0(hpc_scope *s, struct RClass *klass, HIR *recv, mrb_sym mid, HIR *args,
+    node *blk)
+{
+  struct RProc *proc;
+  mrb_p(s->mrb, recv->lat);
+  mrb_p(s->mrb, mrb_symbol_value(mid));
+  mrb_p(s->mrb, mrb_obj_value(klass));
+  proc = mrb_method_search_vm(s->mrb, &klass, mid);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
 typing_call(hpc_scope *s, node *tree)
 {
+  mrb_sym sym = sym(tree->cdr->car);
   HIR *recv = typing(s, tree->car);
+  HIR *args;
+  node *blk = 0;
+
+  tree = tree->cdr->cdr->car;
+  if (tree) {
+    /* TODO: splat mode */
+    args = typing_args(s, tree->car);
+  }
+  if (tree && tree->cdr) {
+    blk = tree->cdr;
+  }
+
+  if (!LAT_P(s->mrb, recv->lat))
+    return typing_call0(s, mrb_class(s->mrb, recv->lat), recv, sym, args, blk);
+
+  mrb_p(s->mrb, recv->lat);
+
+  NOT_IMPLEMENTED();
+#if 0
   mrb_sym name = sym(tree->cdr->car);
   hpc_state *p = s->hpc;
   HIR *args, *last, *arg;
@@ -833,8 +889,8 @@ typing_call(hpc_scope *s, node *tree)
     }
   }
 
-
   return cons((HIR*)HIR_CALL, cons(hirsym(name), args));
+#endif
 }
 
 static HIR*
@@ -844,7 +900,7 @@ typing(hpc_scope *s, node *tree)
   hpc_state *p = s->hpc;
   s->lineno = tree->lineno;
   int type = (intptr_t)tree->car;
-  parser_dump(p->mrb, tree, 0);
+  //parser_dump(p->mrb, tree, 0);
   tree = tree->cdr;
   switch (type) {
     case NODE_SCOPE:
@@ -997,7 +1053,7 @@ compile(hpc_state *p, node *ast)
 {
   HIR *funcdecls;
   hpc_scope *scope = scope_new(p, 0, 0, FALSE);
-  parser_dump(p->mrb, ast, 0);
+  //parser_dump(p->mrb, ast, 0);
   HIR *main_body = typing(scope, ast);
   mrb_pool_close(scope->mpool);
 
