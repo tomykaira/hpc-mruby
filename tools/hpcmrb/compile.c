@@ -1036,6 +1036,18 @@ typing(hpc_scope *s, node *tree)
       return new_prim(p, HPTYPE_FALSE);
     case NODE_TRUE:
       return new_prim(p, HPTYPE_TRUE);
+    case NODE_NEGATE:
+      /* NEGATE is only for literal */
+      {
+        HIR *child = typing(s, tree);
+        char *old_lit = (char *)child->cdr->car;
+        char *new_lit = compiler_palloc(p, strlen(old_lit) + 2);
+        hpc_assert((intptr_t)child->car == HIR_INT
+                   || (intptr_t)child->car == HIR_FLOAT);
+        sprintf(new_lit, "-%s", old_lit);
+        child->cdr->car = (HIR *)new_lit;
+        return child;
+      }
     default:
       NOT_REACHABLE();
   }
