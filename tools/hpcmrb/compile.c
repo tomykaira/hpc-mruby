@@ -585,6 +585,32 @@ new_str(hpc_state *p, char *str, int length)
 }
 
 static HIR*
+new_cond_op(hpc_state *p, HIR *cond, HIR *t, HIR *f)
+{
+  HIR *hir = list4((HIR*)HIR_COND_OP, cond, t, f);
+  hir->lat = lat_join(p->mrb, t->lat, f->lat);
+  return hir;
+}
+
+static HIR*
+new_prim(hpc_state *p, enum hir_primitive_type t)
+{
+  HIR *hir = cons((HIR*)HIR_PRIM, (HIR*)t);
+  switch (t) {
+  case HPTYPE_NIL:
+    hir->lat = mrb_nil_value();
+    break;
+  case HPTYPE_FALSE:
+    hir->lat = mrb_false_value();
+    break;
+  case HPTYPE_TRUE:
+    hir->lat = mrb_true_value();
+    break;
+  }
+  return hir;
+}
+
+static HIR*
 new_simple_type(hpc_state *p, enum hir_type_kind kind)
 {
   return list1((HIR*)kind);
@@ -992,6 +1018,24 @@ typing(hpc_scope *s, node *tree)
       NOT_IMPLEMENTED();
     case NODE_STR:
       return new_str(p, (char*)tree->car, (int)(intptr_t)tree->cdr);
+    case NODE_AND:
+      /* (lhs ? rhs : lhs) */
+      {
+        HIR *lhs = typing(s, tree->car);
+        HIR *rhs = typing(s, tree->cdr);
+        return new_cond_op(p, lhs, rhs, lhs);
+      }
+    case NODE_OR:
+      /* (lhs ? lhs : rhs) */
+      {
+        HIR *lhs = typing(s, tree->car);
+        HIR *rhs = typing(s, tree->cdr);
+        return new_cond_op(p, lhs, lhs, rhs);
+      }
+    case NODE_FALSE:
+      return new_prim(p, HPTYPE_FALSE);
+    case NODE_TRUE:
+      return new_prim(p, HPTYPE_TRUE);
     default:
       NOT_REACHABLE();
   }
