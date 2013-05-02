@@ -40,6 +40,7 @@ enum hir_type {
   HIR_EMPTY,      /* (:HIR_EMPTY) */
   HIR_INT,        /* (:HIR_INT text base) */
   HIR_FLOAT,      /* (:HIR_FLOAT text base) */
+  HIR_STRING,     /* (:HIR_STRING text length) */
   HIR_LVAR,       /* (:HIR_LVAR . symbol) */
   HIR_GVAR,       /* (:HIR_GVAR . symbol) */
   HIR_CALL,       /* (:HIR_CALL func args...) */

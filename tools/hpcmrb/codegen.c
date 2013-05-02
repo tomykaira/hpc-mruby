@@ -238,6 +238,18 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       PUTS((char *)CADR(exp));
       PUTS(")");
       return;
+    case HIR_STRING:
+
+      PUTS("mrb_str_new(mrb, \"");
+      PUTS((char *)CADR(exp));
+      PUTS("\", ");
+      {
+        char len[32];
+        sprintf(len, "%d", (int)(intptr_t)CADDR(exp));
+        PUTS(len);
+      }
+      PUTS(")");
+      return;
     case HIR_LVAR:
     case HIR_GVAR:
       put_symbol(c, exp->cdr);

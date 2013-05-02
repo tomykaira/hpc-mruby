@@ -576,6 +576,14 @@ new_assign(hpc_state *p, HIR *lhs, HIR *rhs)
 }
 
 static HIR*
+new_str(hpc_state *p, char *str, int length)
+{
+  HIR *hir = list3((HIR*)HIR_STRING, (HIR*)str, (HIR*)(intptr_t)length);
+  hir->lat = mrb_str_new(p->mrb, str, length);
+  return hir;
+}
+
+static HIR*
 new_simple_type(hpc_state *p, enum hir_type_kind kind)
 {
   return list1((HIR*)kind);
@@ -973,6 +981,14 @@ typing(hpc_scope *s, node *tree)
         }
         return gvar;
       }
+    case NODE_MODULE:
+      return new_empty(p);
+      NOT_IMPLEMENTED();
+    case NODE_CLASS:
+      return new_empty(p);
+      NOT_IMPLEMENTED();
+    case NODE_STR:
+      return new_str(p, (char*)tree->car, (int)(intptr_t)tree->cdr);
     default:
       NOT_REACHABLE();
   }
