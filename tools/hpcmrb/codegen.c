@@ -385,6 +385,8 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       /* lhs is HIR_LVAR or HIR_GVAR,
          rhs is exp */
       PUTS_INDENT;
+      hpc_assert(TYPE(CADR(stat)) == HIR_LVAR
+                 || TYPE(CADR(stat)) == HIR_GVAR);
       put_symbol(c, CADR(stat)->cdr);
       PUTS(" = ");
       put_exp(c, CADDR(stat));
