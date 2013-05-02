@@ -167,6 +167,9 @@ put_function_name(hpc_codegen_context *c, HIR *sym)
   else if (len == 2 && name[0] == '=' && name[1] == '=')  {
     PUTS("num_eq");
   }
+  else if (len == 1 && name[0] == '!')  {
+    PUTS("mrb_bob_not");
+  }
   else {
     put_symbol(c, sym);
   }
