@@ -963,6 +963,7 @@ typing(hpc_scope *s, node *tree)
       }
     case NODE_ASGN:
       return new_assign(p, typing(s, tree->car), typing(s, tree->cdr));
+    case NODE_CONST:
     case NODE_GVAR:
       {
         HIR *gvar = find_var_list(p, p->gvars, sym(tree));
