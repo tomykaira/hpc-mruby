@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 #include "hpcmrb.h"
 #include "mruby/array.h"
 #include "mruby/data.h"
@@ -951,6 +952,8 @@ typing(hpc_scope *s, node *tree)
           return new_int(p, txt, base, i);
         }
       }
+    case NODE_FLOAT:
+      return new_float(p, (char *)tree, 10, str_to_mrb_float((char *)tree));
     case NODE_DEF:
       /* This node will be translated later using information of call-sites */
       add_def(s, tree);
