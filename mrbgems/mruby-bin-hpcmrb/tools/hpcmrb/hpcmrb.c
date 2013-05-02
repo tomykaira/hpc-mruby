@@ -258,20 +258,3 @@ main(int argc, char **argv)
   cleanup(mrb, &args);
   return EXIT_SUCCESS;
 }
-
-void
-mrb_init_mrblib(mrb_state *mrb)
-{
-}
-
-#ifndef DISABLE_GEMS
-void
-mrb_init_mrbgems(mrb_state *mrb)
-{
-}
-
-void
-mrb_final_mrbgems(mrb_state *mrb)
-{
-}
-#endif

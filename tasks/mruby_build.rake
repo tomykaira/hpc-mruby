@@ -74,7 +74,7 @@ module MRuby
         @git = Command::Git.new(self)
         @mrbc = Command::Mrbc.new(self)
 
-        @bins = %w(mrbc hpcmrb)
+        @bins = %w(mrbc)
         @gems, @libmruby = [], []
         @build_mrbtest_lib_only = false
 
@@ -101,10 +101,6 @@ module MRuby
 
     def mrbcfile
       MRuby.targets['host'].exefile("#{MRuby.targets['host'].build_dir}/bin/mrbc")
-    end
-
-    def hpcmrbfile
-      MRuby.targets['host'].exefile("#{MRuby.targets['host'].build_dir}/bin/hpcmrb")
     end
 
     def compilers
