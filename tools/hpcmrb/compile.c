@@ -4,7 +4,9 @@
 #include "mruby/array.h"
 #include "mruby/class.h"
 #include "mruby/data.h"
+#include "mruby/proc.h"
 #include "mruby/string.h"
+#include "mruby/variable.h"
 #include "node.h"
 
 /* Lattice for abstract intepreration */
@@ -779,6 +781,20 @@ scope_finish(hpc_scope *s)
   mrb_pool_close(s->mpool);
 }
 
+static struct Proc*
+search_abst_evaluator(mrb_state *mrb, struct RClass *klass, mrb_sym mid)
+{
+  struct RProc *m;
+  mrb_value m_obj;
+  m = mrb_method_search_vm(mrb, &klass, mid);
+  if (!m) {
+    /* TODO: emulate method_missing */
+    NOT_IMPLEMENTED();
+  }
+  m_obj = mrb_iv_get(mrb, mrb_obj_value(m), mrb_intern(mrb, "__aeval__"));
+  mrb_p(mrb, m_obj);
+}
+
 static void
 add_def(hpc_scope *s, node *tree)
 {
@@ -835,11 +851,10 @@ static HIR*
 typing_call0(hpc_scope *s, struct RClass *klass, HIR *recv, mrb_sym mid, HIR *args,
     node *blk)
 {
-  struct RProc *proc;
   mrb_p(s->mrb, recv->lat);
   mrb_p(s->mrb, mrb_symbol_value(mid));
   mrb_p(s->mrb, mrb_obj_value(klass));
-  proc = mrb_method_search_vm(s->mrb, &klass, mid);
+  search_abst_evaluator(s->mrb, klass, mid);
   NOT_IMPLEMENTED();
 }
 
@@ -1123,4 +1138,6 @@ init_hpc_compiler(hpc_state *p)
   float_type  = new_simple_type(p, HTYPE_FLOAT);
   string_type = new_simple_type(p, HTYPE_STRING);
   mrb_state_ptr_type = new_ptr_type(p, new_typedef_type(p, "mrb_state"));
+
+
 }
