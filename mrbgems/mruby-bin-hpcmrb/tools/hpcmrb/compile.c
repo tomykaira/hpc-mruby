@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 #include "hpcmrb.h"
 #include "mruby/array.h"
 #include "mruby/class.h"
@@ -85,7 +86,9 @@ lat_inspect(mrb_state *mrb, mrb_value lat)
         }
         return mrb_str_buf_cat(mrb, buf, "}", 1);
       }
-    /* LAT_CONST is not of Lattice class */
+    /* LAT_CONST is not of Lattice class, but for pretty printing */
+    case LAT_CONST:
+      return mrb_any_to_s(mrb, lat);
     default:
       break;
   }
@@ -471,9 +474,23 @@ new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 }
 
 static HIR*
+new_gvar(hpc_state *p, mrb_sym sym, mrb_value lat)
+{
+  HIR *var = cons((HIR*)HIR_GVAR, hirsym(sym));
+  var->lat = lat;
+  return var;
+}
+
+static HIR*
 new_lvardecl(hpc_state *p, HIR *type, mrb_sym sym, HIR *val)
 {
   return list4((HIR*)HIR_LVARDECL, type, hirsym(sym), val);
+}
+
+static HIR*
+new_gvardecl(hpc_state *p, HIR *type, mrb_sym sym, HIR *val)
+{
+  return list4((HIR*)HIR_GVARDECL, type, hirsym(sym), val);
 }
 
 static HIR*
@@ -560,6 +577,49 @@ new_return_void(hpc_state *p)
 {
   HIR *hir = list1((HIR*)HIR_RETURN);
   hir->lat = mrb_nil_value();
+  return hir;
+}
+
+static HIR*
+new_assign(hpc_state *p, HIR *lhs, HIR *rhs)
+{
+  HIR *hir = list3((HIR*)HIR_ASSIGN, lhs, rhs);
+  lhs->lat = lat_join(p->mrb, lhs->lat, rhs->lat); /* FIXME: bug here */
+  hir->lat = rhs->lat;
+  return hir;
+}
+
+static HIR*
+new_str(hpc_state *p, char *str, int length)
+{
+  HIR *hir = list3((HIR*)HIR_STRING, (HIR*)str, (HIR*)(intptr_t)length);
+  hir->lat = mrb_str_new(p->mrb, str, length);
+  return hir;
+}
+
+static HIR*
+new_cond_op(hpc_state *p, HIR *cond, HIR *t, HIR *f)
+{
+  HIR *hir = list4((HIR*)HIR_COND_OP, cond, t, f);
+  hir->lat = lat_join(p->mrb, t->lat, f->lat);
+  return hir;
+}
+
+static HIR*
+new_prim(hpc_state *p, enum hir_primitive_type t)
+{
+  HIR *hir = cons((HIR*)HIR_PRIM, (HIR*)t);
+  switch (t) {
+  case HPTYPE_NIL:
+    hir->lat = mrb_nil_value();
+    break;
+  case HPTYPE_FALSE:
+    hir->lat = mrb_false_value();
+    break;
+  case HPTYPE_TRUE:
+    hir->lat = mrb_true_value();
+    break;
+  }
   return hir;
 }
 
@@ -821,6 +881,44 @@ add_def(hpc_scope *s, node *tree)
 static HIR *typing(hpc_scope *s, node *tree);
 
 static HIR*
+infer_type(hpc_state *p, mrb_value lat)
+{
+  /* TODO: infer type from lattice */
+  return value_type;
+}
+
+static HIR*
+lvs_to_decls(hpc_scope *s, HIR *lvs)
+{
+  HIR *lv_decls = 0;
+  hpc_state *p = s->hpc;
+
+  while (lvs) {
+    mrb_sym sym = sym(lvs->car->cdr);
+    lv_decls = cons(new_lvardecl(p, infer_type(p, lvs->car->lat), sym, new_empty(p)), lv_decls);
+    lvs = lvs->cdr;
+  }
+
+  return lv_decls;
+}
+
+/*
+  list: list of HIR_GVAR or HIR_LVAR
+  return: 0 if not found
+ */
+static HIR*
+find_var_list(hpc_state *p, HIR *list, mrb_sym needle)
+{
+  while (list) {
+    if (sym(list->car->cdr) == needle) {
+      return list->car;
+    }
+    list = list->cdr;
+  }
+  return 0;
+}
+
+static HIR*
 typing_scope(hpc_scope *s, node *tree)
 {
   HIR* hir;
@@ -835,7 +933,7 @@ typing_scope(hpc_scope *s, node *tree)
   }
 
   hpc_scope *scope = scope_new(p, s, lv, TRUE);
-  hir = new_scope(p, scope->lv, typing(scope, tree->cdr));
+  hir = new_scope(p, lvs_to_decls(scope, scope->lv), typing(scope, tree->cdr));
   scope_finish(scope);
   return hir;
 }
@@ -998,12 +1096,8 @@ typing(hpc_scope *s, node *tree)
           return new_int(p, txt, base, i);
         }
       }
-    case NODE_STR:
-      {
-        char *txt = (char*)tree->car;
-        int len = (intptr_t)tree->cdr;
-        return new_str(p, txt, len);
-      }
+    case NODE_FLOAT:
+      return new_float(p, (char *)tree, 10, str_to_mrb_float((char *)tree));
     case NODE_DEF:
       /* This node will be translated later using information of call-sites */
       add_def(s, tree);
@@ -1021,6 +1115,56 @@ typing(hpc_scope *s, node *tree)
       {
         node *c = tree;
         return new_return_value(p, typing(s, c));
+      }
+    case NODE_ASGN:
+      return new_assign(p, typing(s, tree->car), typing(s, tree->cdr));
+    case NODE_CONST:
+    case NODE_GVAR:
+      {
+        HIR *gvar = find_var_list(p, p->gvars, sym(tree));
+        if (!gvar) {
+          gvar = new_gvar(p, sym(tree), lat_unknown);
+          p->gvars = cons(gvar, p->gvars);
+        }
+        return gvar;
+      }
+    case NODE_MODULE:
+      return new_empty(p);
+      NOT_IMPLEMENTED();
+    case NODE_CLASS:
+      return new_empty(p);
+      NOT_IMPLEMENTED();
+    case NODE_STR:
+      return new_str(p, (char*)tree->car, (int)(intptr_t)tree->cdr);
+    case NODE_AND:
+      /* (lhs ? rhs : lhs) */
+      {
+        HIR *lhs = typing(s, tree->car);
+        HIR *rhs = typing(s, tree->cdr);
+        return new_cond_op(p, lhs, rhs, lhs);
+      }
+    case NODE_OR:
+      /* (lhs ? lhs : rhs) */
+      {
+        HIR *lhs = typing(s, tree->car);
+        HIR *rhs = typing(s, tree->cdr);
+        return new_cond_op(p, lhs, lhs, rhs);
+      }
+    case NODE_FALSE:
+      return new_prim(p, HPTYPE_FALSE);
+    case NODE_TRUE:
+      return new_prim(p, HPTYPE_TRUE);
+    case NODE_NEGATE:
+      /* NEGATE is only for literal */
+      {
+        HIR *child = typing(s, tree);
+        char *old_lit = (char *)child->cdr->car;
+        char *new_lit = compiler_palloc(p, strlen(old_lit) + 2);
+        hpc_assert((intptr_t)child->car == HIR_INT
+                   || (intptr_t)child->car == HIR_FLOAT);
+        sprintf(new_lit, "-%s", old_lit);
+        child->cdr->car = (HIR *)new_lit;
+        return child;
       }
     default:
       NOT_REACHABLE();
@@ -1118,7 +1262,7 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
 static HIR*
 compile(hpc_state *p, node *ast)
 {
-  HIR *funcdecls;
+  HIR *topdecls;
   hpc_scope *scope = scope_new(p, 0, 0, FALSE);
   //parser_dump(p->mrb, ast, 0);
   HIR *main_body = typing(scope, ast);
@@ -1131,16 +1275,24 @@ compile(hpc_state *p, node *ast)
   HIR *main_fun = new_fundecl(p, mrb_intern(p->mrb, "compiled_main"),
       new_func_type(p, void_type, params), params, main_body);
 
-  funcdecls = cons(main_fun, 0);
+  topdecls = cons(main_fun, 0);
+
   while (scope->defs) {
     /* FIXME: this management of defs possibly has bug */
     node *tree = (node *)scope->defs->car;
     scope->defs = scope->defs->cdr;
     HIR *hir_tree = compile_def(p, scope, tree);
-    funcdecls = cons(hir_tree, funcdecls);
+    topdecls = cons(hir_tree, topdecls);
   }
 
-  return funcdecls;
+  while (p->gvars) {
+    HIR *gvar = p->gvars->car;
+    topdecls = cons(new_gvardecl(p, infer_type(p, gvar->lat), sym(gvar->cdr), new_empty(p)),
+                    topdecls);
+    p->gvars = p->gvars->cdr;
+  }
+
+  return topdecls;
 }
 
 HIR*

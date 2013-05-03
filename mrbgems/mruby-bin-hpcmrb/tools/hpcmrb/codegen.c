@@ -167,6 +167,9 @@ put_function_name(hpc_codegen_context *c, HIR *sym)
   else if (len == 2 && name[0] == '=' && name[1] == '=')  {
     PUTS("num_eq");
   }
+  else if (len == 1 && name[0] == '!')  {
+    PUTS("mrb_bob_not");
+  }
   else {
     put_symbol(c, sym);
   }
@@ -180,9 +183,9 @@ put_decl(hpc_codegen_context *c, HIR *decl)
     case HIR_GVARDECL:
     case HIR_LVARDECL:
       put_variable(c, decl->cdr);
-      if (TYPE(CADDR(decl)) != HIR_EMPTY) {
+      if (TYPE(CADDDR(decl)) != HIR_EMPTY) {
         PUTS(" = ");
-        put_exp(c, CADDR(decl));
+        put_exp(c, CADDDR(decl));
       }
       PUTS(";\n");
       return;
@@ -228,6 +231,18 @@ static void
 put_exp(hpc_codegen_context *c, HIR *exp)
 {
   switch (TYPE(exp)) {
+    case HIR_PRIM:
+      switch ((enum hir_primitive_type)exp->cdr) {
+      case HPTYPE_NIL:
+        PUTS("mrb_nil_value()");
+        return;
+      case HPTYPE_FALSE:
+        PUTS("mrb_false_value()");
+        return;
+      case HPTYPE_TRUE:
+        PUTS("mrb_true_value()");
+        return;
+      }
     case HIR_INT:
       PUTS("mrb_fixnum_value(");
       PUTS((char *)CADR(exp));
@@ -236,6 +251,18 @@ put_exp(hpc_codegen_context *c, HIR *exp)
     case HIR_FLOAT:
       PUTS("mrb_float_value(");
       PUTS((char *)CADR(exp));
+      PUTS(")");
+      return;
+    case HIR_STRING:
+
+      PUTS("mrb_str_new(mrb, \"");
+      PUTS((char *)CADR(exp));
+      PUTS("\", ");
+      {
+        char len[32];
+        sprintf(len, "%d", (int)(intptr_t)CADDR(exp));
+        PUTS(len);
+      }
       PUTS(")");
       return;
     case HIR_LVAR:
@@ -261,6 +288,15 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       }
       PUTS(")");
       return;
+    case HIR_COND_OP:
+      PUTS("( mrb_bool(");
+      put_exp(c, CADR(exp));
+      PUTS(") ? ");
+      put_exp(c, CADDR(exp));
+      PUTS(" : ");
+      put_exp(c, CADDDR(exp));
+      PUTS(" )");
+      return;
     case HIR_INIT_LIST:
       PUTS("{");
       {
@@ -273,6 +309,20 @@ put_exp(hpc_codegen_context *c, HIR *exp)
         }
       }
       PUTS("}");
+    case HIR_BLOCK:
+      /* FIXME: ruby: (stat1; stat2; stat3) return the result of stat3 */
+      {
+        HIR *exps = exp->cdr->car;
+        PUTS("(");
+        while (exps) {
+          put_exp(c, exps->car);
+          if (exps->cdr)
+            PUTS(", ");
+          exps = exps->cdr;
+        }
+        PUTS(")");
+      }
+      return;
     default:
       NOT_REACHABLE();
   }
@@ -332,9 +382,12 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       }
       return;
     case HIR_ASSIGN:
-      /* FIXME: assuming that lhs is sym, rhs is exp */
+      /* lhs is HIR_LVAR or HIR_GVAR,
+         rhs is exp */
       PUTS_INDENT;
-      put_symbol(c, CADR(stat));
+      hpc_assert(TYPE(CADR(stat)) == HIR_LVAR
+                 || TYPE(CADR(stat)) == HIR_GVAR);
+      put_symbol(c, CADR(stat)->cdr);
       PUTS(" = ");
       put_exp(c, CADDR(stat));
       PUTS(";\n");
@@ -368,7 +421,7 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
         PUTS("for (");
         put_symbol(c, sym); PUTS(" = "); put_exp(c, low); PUTS("; ");
         put_symbol(c, sym); PUTS(" < "); put_exp(c, high); PUTS("; ");
-        puts("++"); put_symbol(c, sym); PUTS(")\n");
+        PUTS("++"); put_symbol(c, sym); PUTS(")\n");
         put_statement(c, CADDDDR(stat), FALSE);
       }
       return;

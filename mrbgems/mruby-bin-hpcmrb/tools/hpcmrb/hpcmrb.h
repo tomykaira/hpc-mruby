@@ -29,7 +29,7 @@ enum hir_type {
   HIR_SCOPE,      /* (:HIR_SCOPE (vars...) . statement) */
   HIR_BLOCK,      /* (:HIR_BLOCK (statements...)) */
   HIR_ASSIGN,     /* (:HIR_ASSIGN lhs rhs) */
-  HIR_IFELSE,     /* (:HIR_IFELSE cond ifthen ifelse) */
+  HIR_IFELSE,     /* (:HIR_IFELSE cond ifthen ifelse); ifthen and ifelse: stat */
   HIR_DOALL,      /* (:HIR_DOALL var low high body) */
   HIR_WHILE,      /* (:HIR_WHILE cond body) */
   HIR_BREAK,      /* (:HIR_BREAK) */
@@ -38,12 +38,20 @@ enum hir_type {
 
   /* expressions */
   HIR_EMPTY,      /* (:HIR_EMPTY) */
+  HIR_PRIM,       /* (:HIR_PRIM . primitive_type) */
   HIR_INT,        /* (:HIR_INT text base) */
   HIR_FLOAT,      /* (:HIR_FLOAT text base) */
-  HIR_STR,        /* (:HIR_STR text len) */
+  HIR_STRING,     /* (:HIR_STRING text length) */
   HIR_LVAR,       /* (:HIR_LVAR . symbol) */
   HIR_GVAR,       /* (:HIR_GVAR . symbol) */
   HIR_CALL,       /* (:HIR_CALL func args...) */
+  HIR_COND_OP,    /* (:HIR_COND_OP cond t f) t and f are exp */
+};
+
+enum hir_primitive_type {
+  HPTYPE_NIL,
+  HPTYPE_FALSE,
+  HPTYPE_TRUE,
 };
 
 enum hir_type_kind {
@@ -81,6 +89,7 @@ typedef struct hpc_state {
   struct mrb_pool *pool;
   HIR *decls;
   HIR *cells;
+  HIR *gvars;                   /* found global variables */
   short line;
   jmp_buf jmp;
 } hpc_state;

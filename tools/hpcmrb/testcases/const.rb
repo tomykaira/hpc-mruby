@@ -1,0 +1,4 @@
+CONST = 10
+puts CONST
+CONST = 20
+puts CONST
