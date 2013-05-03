@@ -981,54 +981,63 @@ typing_prim_call(hpc_scope *s, struct RProc *interp, HIR *recv, mrb_sym mid, HIR
 static HIR*
 typing_prim_add(hpc_scope *s, HIR *recv, HIR *args)
 {
+  hpc_assert(!args->cdr);
   NOT_IMPLEMENTED();
 }
 
 static HIR*
 typing_prim_sub(hpc_scope *s, HIR *recv, HIR *args)
 {
+  hpc_assert(!args->cdr);
   NOT_IMPLEMENTED();
 }
 
 static HIR*
 typing_prim_mul(hpc_scope *s, HIR *recv, HIR *args)
 {
+  hpc_assert(!args->cdr);
   NOT_IMPLEMENTED();
 }
 
 static HIR*
 typing_prim_div(hpc_scope *s, HIR *recv, HIR *args)
 {
+  hpc_assert(!args->cdr);
   NOT_IMPLEMENTED();
 }
 
 static HIR*
 typing_prim_lt(hpc_scope *s, HIR *recv, HIR *args)
 {
+  hpc_assert(!args->cdr);
   NOT_IMPLEMENTED();
 }
 
 static HIR*
 typing_prim_ltasgn(hpc_scope *s, HIR *recv, HIR *args)
 {
+  hpc_assert(!args->cdr);
   NOT_IMPLEMENTED();
 }
 
 static HIR*
 typing_prim_gt(hpc_scope *s, HIR *recv, HIR *args)
 {
+  hpc_assert(!args->cdr);
   NOT_IMPLEMENTED();
 }
 
 static HIR*
 typing_prim_gtasgn(hpc_scope *s, HIR *recv, HIR *args)
 {
+  hpc_assert(!args->cdr);
   NOT_IMPLEMENTED();
 }
 
 static HIR*
 typing_prim_equal(hpc_scope *s, HIR *recv, HIR *args)
 {
+  hpc_assert(!args->cdr);
   NOT_IMPLEMENTED();
 }
 
