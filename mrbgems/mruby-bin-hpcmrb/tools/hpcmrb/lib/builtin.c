@@ -91,7 +91,7 @@ num_subi(mrb_value a, mrb_int b)
       x = mrb_fixnum(a);
       y = b;
       z = x - y;
-      if (((x < 0) ^ (y < 0)) != 0 && (x < 0) != (z < 0)) {      
+      if (((x < 0) ^ (y < 0)) != 0 && (x < 0) != (z < 0)) {
         /* integer overflow */
         return mrb_float_value((mrb_float)x - (mrb_float)y);
       }
@@ -154,7 +154,7 @@ num_div(mrb_value a, mrb_value b)
 }
 
 #define OP_CMP_BODY(op,v1,v2) do {\
-  if (a.v1 op b.v2) {\
+  if (a.value.v1 op b.value.v2) {\
     return mrb_true_value();\
   }\
   else {\
@@ -166,13 +166,13 @@ num_div(mrb_value a, mrb_value b)
   /* need to check if - is overridden */\
   switch (TYPES2(mrb_type(a),mrb_type(b))) {\
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FIXNUM):\
-    OP_CMP_BODY(op,attr_i,attr_i);\
+    OP_CMP_BODY(op,i,i);\
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FLOAT):\
-    OP_CMP_BODY(op,attr_i,attr_f);\
+    OP_CMP_BODY(op,i,f);\
   case TYPES2(MRB_TT_FLOAT,MRB_TT_FIXNUM):\
-    OP_CMP_BODY(op,attr_f,attr_i);\
+    OP_CMP_BODY(op,f,i);\
   case TYPES2(MRB_TT_FLOAT,MRB_TT_FLOAT):\
-    OP_CMP_BODY(op,attr_f,attr_f);\
+    OP_CMP_BODY(op,f,f);\
   default:\
     NOT_REACHABLE();\
   }\
