@@ -795,15 +795,14 @@ static struct Proc*
 search_abst_interp(mrb_state *mrb, struct RClass *klass, mrb_sym mid)
 {
   struct RProc *m;
-  mrb_value m_obj;
   m = mrb_method_search_vm(mrb, &klass, mid);
   if (!m) {
     /* TODO: emulate method_missing */
     NOT_IMPLEMENTED();
   }
   if (MRB_PROC_CFUNC_P(m)) {
-    m_obj = mrb_iv_get(mrb, mrb_obj_value(m), mrb_intern(mrb, "__interp__"));
-    if (mrb_type(m_obj) != MRB_TT_PROC)
+    m = get_interp(m);
+    if (!m)
       mrb_raisef(mrb, E_NOTIMP_ERROR, "Abstract interpreter for %S",
           mrb_symbol_value(mid));
     NOT_IMPLEMENTED();
