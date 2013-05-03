@@ -805,7 +805,7 @@ search_abst_interp(mrb_state *mrb, struct RClass *klass, mrb_sym mid)
     if (!m)
       mrb_raisef(mrb, E_NOTIMP_ERROR, "Abstract interpreter for %S",
           mrb_symbol_value(mid));
-    NOT_IMPLEMENTED();
+    return m;
   } else {
     NOT_IMPLEMENTED();
   }
@@ -863,14 +863,44 @@ typing_args(hpc_scope *s, node *args)
   return hir;
 }
 
+#define PRIMCALL_ARGC_MAX 16
+
+static HIR *
+typing_prim_call(hpc_scope *s, struct RProc *interp, HIR *recv, mrb_sym mid, HIR *args, node *blk)
+{
+  mrb_value *argv, argv_s[PRIMCALL_ARGC_MAX];
+  mrb_value ret;
+  int i, argc = hir_len(args);
+
+  if (argc > PRIMCALL_ARGC_MAX)
+    argv = (mrb_value *)mrb_malloc(s->mrb, sizeof(mrb_value)*argc);
+  else
+    argv = argv_s;
+
+  for (i = 0; i < argc; i++) {
+    argv[i] = args->car->lat;
+    args = args->cdr;
+  }
+
+  if (blk)
+    NOT_IMPLEMENTED();
+
+  ret = mrb_proccall_with_block(s->mrb, recv->lat, interp, mid, argc, argv, mrb_nil_value());
+  mrb_p(s->mrb, ret);
+  NOT_IMPLEMENTED();
+}
+
 static HIR*
 typing_call0(hpc_scope *s, struct RClass *klass, HIR *recv, mrb_sym mid, HIR *args,
     node *blk)
 {
+  struct RProc *interp = 0;
   mrb_p(s->mrb, recv->lat);
   mrb_p(s->mrb, mrb_symbol_value(mid));
   mrb_p(s->mrb, mrb_obj_value(klass));
-  search_abst_interp(s->mrb, klass, mid);
+  interp = search_abst_interp(s->mrb, klass, mid);
+  if (interp)
+    return typing_prim_call(s, interp, recv, mid, args, blk);
   NOT_IMPLEMENTED();
 }
 
@@ -879,7 +909,7 @@ typing_call(hpc_scope *s, node *tree)
 {
   mrb_sym sym = sym(tree->cdr->car);
   HIR *recv = typing(s, tree->car);
-  HIR *args;
+  HIR *args = 0;
   node *blk = 0;
 
   tree = tree->cdr->cdr->car;
