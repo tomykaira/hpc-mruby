@@ -525,6 +525,16 @@ new_float(hpc_state *p, char *text, int base, double val)
 }
 
 static HIR*
+new_str(hpc_state *p, char *text, int len)
+{
+  int ai = mrb_gc_arena_save(p->mrb);
+  HIR *lit = list3((HIR*)HIR_STR, (HIR*)text, (HIR*)(intptr_t)len);
+  lit->lat = mrb_str_new(p->mrb, text, len);
+  mrb_gc_arena_restore(p->mrb, ai);
+  return lit;
+}
+
+static HIR*
 new_ifelse(hpc_state *p, HIR* cond, HIR* ifthen, HIR* ifelse)
 {
 
@@ -958,6 +968,12 @@ typing(hpc_scope *s, node *tree)
         } else {
           return new_int(p, txt, base, i);
         }
+      }
+    case NODE_STR:
+      {
+        char *txt = (char*)tree->car;
+        int len = (intptr_t)tree->cdr;
+        return new_str(p, txt, len);
       }
     case NODE_DEF:
       /* This node will be translated later using information of call-sites */
