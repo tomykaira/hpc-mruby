@@ -542,16 +542,6 @@ new_float(hpc_state *p, char *text, int base, double val)
 }
 
 static HIR*
-new_str(hpc_state *p, char *text, int len)
-{
-  int ai = mrb_gc_arena_save(p->mrb);
-  HIR *lit = list3((HIR*)HIR_STR, (HIR*)text, (HIR*)(intptr_t)len);
-  lit->lat = mrb_str_new(p->mrb, text, len);
-  mrb_gc_arena_restore(p->mrb, ai);
-  return lit;
-}
-
-static HIR*
 new_ifelse(hpc_state *p, HIR* cond, HIR* ifthen, HIR* ifelse)
 {
 
@@ -989,13 +979,90 @@ typing_prim_call(hpc_scope *s, struct RProc *interp, HIR *recv, mrb_sym mid, HIR
 }
 
 static HIR*
+typing_prim_add(hpc_scope *s, HIR *recv, HIR *args)
+{
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_sub(hpc_scope *s, HIR *recv, HIR *args)
+{
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_mul(hpc_scope *s, HIR *recv, HIR *args)
+{
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_div(hpc_scope *s, HIR *recv, HIR *args)
+{
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_lt(hpc_scope *s, HIR *recv, HIR *args)
+{
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_ltasgn(hpc_scope *s, HIR *recv, HIR *args)
+{
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_gt(hpc_scope *s, HIR *recv, HIR *args)
+{
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_gtasgn(hpc_scope *s, HIR *recv, HIR *args)
+{
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_equal(hpc_scope *s, HIR *recv, HIR *args)
+{
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
 typing_call0(hpc_scope *s, struct RClass *klass, HIR *recv, mrb_sym mid, HIR *args,
     node *blk)
 {
   struct RProc *interp = 0;
+  size_t len;
+  const char *name = mrb_sym2name_len(s->mrb, mid, &len);
+
   mrb_p(s->mrb, recv->lat);
   mrb_p(s->mrb, mrb_symbol_value(mid));
   mrb_p(s->mrb, mrb_obj_value(klass));
+
+  if (len == 1 && name[0] == '+')
+    return typing_prim_add(s, recv, args);
+  else if (len == 1 && name[0] == '-')
+    return typing_prim_sub(s, recv, args);
+  else if (len == 1 && name[0] == '*')
+    return typing_prim_mul(s, recv, args);
+  else if (len == 1 && name[0] == '/')
+    return typing_prim_div(s, recv, args);
+  else if (len == 1 && name[0] == '<')
+    return typing_prim_lt(s, recv, args);
+  else if (len == 2 && name[0] == '<' && name[1] == '=')
+    return typing_prim_ltasgn(s, recv, args);
+  else if (len == 1 && name[0] == '>')
+    return typing_prim_gt(s, recv, args);
+  else if (len == 2 && name[0] == '>' && name[1] == '=')
+    return typing_prim_gtasgn(s, recv, args);
+  else if (len == 2 && name[0] == '=' && name[1] == '=')
+    return typing_prim_equal(s, recv, args);
+
   interp = search_abst_interp(s->mrb, klass, mid);
   if (interp)
     return typing_prim_call(s, interp, recv, mid, args, blk);
