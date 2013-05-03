@@ -474,6 +474,12 @@ new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 }
 
 static HIR*
+dup_lvar(hpc_state *p, HIR *lvar)
+{
+  return cons(lvar->car, lvar->cdr);
+}
+
+static HIR*
 new_gvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 {
   HIR *var = cons((HIR*)HIR_GVAR, hirsym(sym));
@@ -549,7 +555,7 @@ new_ifelse(hpc_state *p, HIR* cond, HIR* ifthen, HIR* ifelse)
   if (ifelse) {
     hir->lat = lat_join(p->mrb, ifthen->lat, ifelse->lat);
   } else {
-    hir->lat = lat_clone(p->mrb, ifthen->lat);
+    hir->lat = lat_join(p->mrb, ifthen->lat, mrb_nil_value());
   }
   return hir;
 }
@@ -805,7 +811,6 @@ readint_mrb_int(hpc_scope *s, const char *p, int base, int neg, int *overflow)
   return result;
 }
 
-
 static hpc_scope*
 scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
 {
@@ -813,7 +818,7 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
   mrb_pool *pool = mrb_pool_open(p->mrb);
   hpc_scope *s = (hpc_scope *)mrb_pool_alloc(pool, sizeof(hpc_scope));
 
-  if (!s) hpc_error(s, "mrb_pool_alloc failed");
+  if (!s) hpc_error(prev, "mrb_pool_alloc failed");
   *s = hpc_scope_zero;
   s->hpc = p;
   s->mrb = p->mrb;
@@ -852,6 +857,68 @@ scope_finish(hpc_scope *s)
   }
   mrb_gc_arena_restore(mrb, s->ai);
   mrb_pool_close(s->mpool);
+}
+
+static hpc_scope*
+scope_dup(hpc_scope *s)
+{
+  hpc_state *p = s->hpc;
+  mrb_pool *pool = mrb_pool_open(p->mrb);
+  hpc_scope *s2 = (hpc_scope *)mrb_pool_alloc(pool, sizeof(hpc_scope));
+  if (!s2) hpc_error(s, "mrb_pool_alloc failed");
+
+  memcpy(s2, s, sizeof(hpc_scope));
+
+  s2->mpool = pool;
+
+  /* TODO: clone state of global and instance variables */
+
+  HIR *new_lv = 0, *last = 0, *lv = s->lv;
+  while (lv) {
+    if (!new_lv)
+      new_lv = last = cons(dup_lvar(p, lv->car), 0);
+    else
+      last->cdr = cons(dup_lvar(p, lv->car), 0);
+    lv = lv->cdr;
+  }
+
+  s2->lv = new_lv;
+  s2->ai = mrb_gc_arena_save(p->mrb);
+  return s2;
+}
+
+static void
+join_scope(hpc_scope *s1, hpc_scope *s2)
+{
+  HIR *lv1;
+  HIR *lv2;
+
+  /* TODO: merge global and instance variables */
+
+  lv1 = s1->lv;
+  lv2 = s2->lv;
+
+  while (lv1) {
+    mrb_value lat1, lat2;
+    int unknown1, unknown2;
+    lat1 = lv1->car->lat;
+    lat2 = lv2->car->lat;
+
+    unknown1 = LAT_HAS_TYPE(s1->mrb, lat1, LAT_UNKNOWN);
+    unknown2 = LAT_HAS_TYPE(s2->mrb, lat2, LAT_UNKNOWN);
+
+    if (unknown1 != unknown2) {
+      if (unknown1)
+        lat1 = mrb_nil_value();
+      else
+        lat2 = mrb_nil_value();
+    }
+
+    lv1->car->lat = lat_join(s1->mrb, lat1, lat2);
+    lv1 = lv1->cdr;
+    lv2 = lv2->cdr;
+  }
+  scope_finish(s2);
 }
 
 static struct RProc*
@@ -1194,10 +1261,16 @@ typing(hpc_scope *s, node *tree)
       add_def(s, tree);
       return new_empty(p);
     case NODE_IF:
-      return new_ifelse(p,
-                        typing(s, tree->car),
-                        typing(s, tree->cdr->car),
-                        typing(s, tree->cdr->cdr->car));
+      {
+        HIR *ifthen = 0, *ifelse = 0, *cond = typing(s, tree->car);
+        hpc_scope *s2 = scope_dup(s);
+        if (tree->cdr->car)
+          ifthen = typing(s, tree->cdr->car);
+        if (tree->cdr->cdr->car)
+          ifelse = typing(s2, tree->cdr->cdr->car);
+        join_scope(s, s2);
+        return new_ifelse(p, cond, ifthen, ifelse);
+      }
     case NODE_LVAR:
       return lookup_lvar(s, sym(tree));
     case NODE_SELF:
