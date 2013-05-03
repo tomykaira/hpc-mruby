@@ -574,7 +574,8 @@ static HIR*
 new_assign(hpc_state *p, HIR *lhs, HIR *rhs)
 {
   HIR *hir = list3((HIR*)HIR_ASSIGN, lhs, rhs);
-  lhs->lat = lat_join(p->mrb, lhs->lat, rhs->lat); /* FIXME: bug here */
+  mrb_p(p->mrb, lhs->lat);
+  lhs->lat = lat_join(p->mrb, lhs->lat, rhs->lat);
   hir->lat = rhs->lat;
   return hir;
 }
@@ -722,6 +723,18 @@ hpc_error(hpc_scope *s, const char *message)
   }
 #endif
   longjmp(s->jmp, 1);
+}
+
+static HIR*
+lookup_lvar(hpc_scope *s, mrb_sym sym)
+{
+  HIR *lv = s->lv;
+  while (lv) {
+    if (sym(lv->car->cdr) == sym)
+      return lv->car;
+    lv = lv->cdr;
+  }
+  NOT_REACHABLE();
 }
 
 static double
@@ -874,6 +887,8 @@ static HIR*
 infer_type(hpc_state *p, mrb_value lat)
 {
   /* TODO: infer type from lattice */
+  puts("Infer type:");
+  mrb_p(p->mrb, lat);
   return value_type;
 }
 
@@ -1184,7 +1199,7 @@ typing(hpc_scope *s, node *tree)
                         typing(s, tree->cdr->car),
                         typing(s, tree->cdr->cdr->car));
     case NODE_LVAR:
-      return new_lvar(p, sym(tree), lat_unknown);
+      return lookup_lvar(s, sym(tree));
     case NODE_SELF:
       return s->current_self;
     case NODE_RETURN:
@@ -1340,7 +1355,7 @@ compile(hpc_state *p, node *ast)
 {
   HIR *topdecls;
   hpc_scope *scope = scope_new(p, 0, 0, FALSE);
-  //parser_dump(p->mrb, ast, 0);
+  parser_dump(p->mrb, ast, 0);
   HIR *main_body = typing(scope, ast);
   mrb_pool_close(scope->mpool);
 
