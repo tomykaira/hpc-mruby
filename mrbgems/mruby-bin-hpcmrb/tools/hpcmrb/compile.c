@@ -1418,6 +1418,4 @@ init_hpc_compiler(hpc_state *p)
   float_type  = new_simple_type(p, HTYPE_FLOAT);
   string_type = new_simple_type(p, HTYPE_STRING);
   mrb_state_ptr_type = new_ptr_type(p, new_typedef_type(p, "mrb_state"));
-
-
 }
