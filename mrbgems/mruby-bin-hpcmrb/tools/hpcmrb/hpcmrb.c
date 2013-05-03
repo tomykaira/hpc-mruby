@@ -236,6 +236,7 @@ main(int argc, char **argv)
 
   hpc_state *p = hpc_state_new(mrb);
   init_hpc_compiler(p);
+  init_prim_interpreters(p);
   hir = hpc_compile_file(p, args.rfp, c);
 
   if (!hir) {

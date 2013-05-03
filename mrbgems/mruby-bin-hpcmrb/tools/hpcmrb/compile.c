@@ -782,7 +782,7 @@ scope_finish(hpc_scope *s)
 }
 
 static struct Proc*
-search_abst_evaluator(mrb_state *mrb, struct RClass *klass, mrb_sym mid)
+search_abst_interp(mrb_state *mrb, struct RClass *klass, mrb_sym mid)
 {
   struct RProc *m;
   mrb_value m_obj;
@@ -791,8 +791,15 @@ search_abst_evaluator(mrb_state *mrb, struct RClass *klass, mrb_sym mid)
     /* TODO: emulate method_missing */
     NOT_IMPLEMENTED();
   }
-  m_obj = mrb_iv_get(mrb, mrb_obj_value(m), mrb_intern(mrb, "__aeval__"));
-  mrb_p(mrb, m_obj);
+  if (MRB_PROC_CFUNC_P(m)) {
+    m_obj = mrb_iv_get(mrb, mrb_obj_value(m), mrb_intern(mrb, "__interp__"));
+    if (mrb_type(m_obj) != MRB_TT_PROC)
+      mrb_raisef(mrb, E_NOTIMP_ERROR, "Abstract interpreter for %S",
+          mrb_symbol_value(mid));
+    NOT_IMPLEMENTED();
+  } else {
+    NOT_IMPLEMENTED();
+  }
 }
 
 static void
@@ -854,7 +861,7 @@ typing_call0(hpc_scope *s, struct RClass *klass, HIR *recv, mrb_sym mid, HIR *ar
   mrb_p(s->mrb, recv->lat);
   mrb_p(s->mrb, mrb_symbol_value(mid));
   mrb_p(s->mrb, mrb_obj_value(klass));
-  search_abst_evaluator(s->mrb, klass, mid);
+  search_abst_interp(s->mrb, klass, mid);
   NOT_IMPLEMENTED();
 }
 

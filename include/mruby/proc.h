@@ -28,6 +28,9 @@ struct RProc {
   } body;
   struct RClass *target_class;
   struct REnv *env;
+#ifdef HPC_MRUBY
+  struct RProc *interp;
+#endif
 };
 
 /* aspec access */
