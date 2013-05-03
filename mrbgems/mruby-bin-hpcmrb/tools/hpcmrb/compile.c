@@ -791,7 +791,7 @@ scope_finish(hpc_scope *s)
   mrb_pool_close(s->mpool);
 }
 
-static struct Proc*
+static struct RProc*
 search_abst_interp(mrb_state *mrb, struct RClass *klass, mrb_sym mid)
 {
   struct RProc *m;
