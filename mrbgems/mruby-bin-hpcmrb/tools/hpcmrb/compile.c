@@ -552,10 +552,14 @@ new_ifelse(hpc_state *p, HIR* cond, HIR* ifthen, HIR* ifelse)
 {
 
   HIR *hir = list4((HIR*)HIR_IFELSE, cond, ifthen, ifelse);
-  if (ifelse) {
+  if (ifthen && ifelse) {
     hir->lat = lat_join(p->mrb, ifthen->lat, ifelse->lat);
-  } else {
+  } else if (ifthen) {
     hir->lat = lat_join(p->mrb, ifthen->lat, mrb_nil_value());
+  } else if (ifelse) {
+    hir->lat = lat_join(p->mrb, ifelse->lat, mrb_nil_value());
+  } else {
+    NOT_REACHABLE();
   }
   return hir;
 }
