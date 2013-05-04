@@ -1,4 +1,6 @@
 a = "foobar"
+b = "puge"
+c = "huga"
 if a
   puts a
 end

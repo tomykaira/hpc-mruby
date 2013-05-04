@@ -869,8 +869,10 @@ scope_dup(hpc_scope *s)
   while (lv) {
     if (!new_lv)
       new_lv = last = cons(dup_lvar(p, lv->car), 0);
-    else
+    else {
       last->cdr = cons(dup_lvar(p, lv->car), 0);
+      last = last->cdr;
+    }
     lv = lv->cdr;
   }
 
