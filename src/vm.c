@@ -378,6 +378,78 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, mr
 }
 
 mrb_value
+mrb_proccall_with_block(mrb_state *mrb, mrb_value self, struct RProc *p, mrb_sym mid, int argc, mrb_value *argv, mrb_value blk)
+{
+  mrb_value val;
+
+  if (!mrb->jmp) {
+    jmp_buf c_jmp;
+    mrb_callinfo *old_ci = mrb->ci;
+
+    if (setjmp(c_jmp) != 0) { /* error */
+      while (old_ci != mrb->ci) {
+        mrb->stack = mrb->stbase + mrb->ci->stackidx;
+        cipop(mrb);
+      }
+      mrb->jmp = 0;
+      val = mrb_obj_value(mrb->exc);
+    }
+    else {
+      mrb->jmp = &c_jmp;
+      /* recursive call */
+      val = mrb_proccall_with_block(mrb, self, p, mid, argc, argv, blk);
+      mrb->jmp = 0;
+    }
+  }
+  else {
+    mrb_callinfo *ci;
+    int n;
+
+    if (!mrb->stack) {
+      stack_init(mrb);
+    }
+    n = mrb->ci->nregs;
+    if (argc < 0) {
+      mrb_raisef(mrb, E_ARGUMENT_ERROR, "negative argc for funcall (%S)", mrb_fixnum_value(argc));
+    }
+    ci = cipush(mrb);
+    ci->mid = mid;
+    ci->proc = p;
+    ci->stackidx = mrb->stack - mrb->stbase;
+    ci->argc = argc;
+    ci->target_class = p->target_class;
+    if (MRB_PROC_CFUNC_P(p)) {
+      ci->nregs = argc + 2;
+    }
+    else {
+      ci->nregs = p->body.irep->nregs + n;
+    }
+    ci->acc = -1;
+    mrb->stack = mrb->stack + n;
+
+    stack_extend(mrb, ci->nregs, 0);
+    mrb->stack[0] = self;
+    if (argc > 0) {
+      stack_copy(mrb->stack+1, argv, argc);
+    }
+    mrb->stack[argc+1] = blk;
+
+    if (MRB_PROC_CFUNC_P(p)) {
+      int ai = mrb_gc_arena_save(mrb);
+      val = p->body.func(mrb, self);
+      mrb_gc_arena_restore(mrb, ai);
+      mrb_gc_protect(mrb, val);
+      mrb->stack = mrb->stbase + mrb->ci->stackidx;
+      cipop(mrb);
+    }
+    else {
+      val = mrb_run(mrb, p, self);
+    }
+  }
+  return val;
+}
+
+mrb_value
 mrb_funcall_argv(mrb_state *mrb, mrb_value self, mrb_sym mid, int argc, mrb_value *argv)
 {
   return mrb_funcall_with_block(mrb, self, mid, argc, argv, mrb_nil_value());

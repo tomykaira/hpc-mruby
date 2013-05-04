@@ -95,6 +95,8 @@ typedef struct hpc_state {
 } hpc_state;
 
 void init_hpc_compiler(hpc_state *p);
+void init_prim_interpreters(hpc_state *p);
+struct RProc *get_interp(struct RProc *p);
 hpc_state* hpc_state_new(mrb_state *mrb);
 HIR *hpc_compile_file(hpc_state*, FILE*, mrbc_context*);
 mrb_value hpc_generate_code(hpc_state*, FILE*, HIR*, mrbc_context*);

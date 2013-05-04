@@ -3,8 +3,11 @@
 #include <stdlib.h>
 #include "hpcmrb.h"
 #include "mruby/array.h"
+#include "mruby/class.h"
 #include "mruby/data.h"
+#include "mruby/proc.h"
 #include "mruby/string.h"
+#include "mruby/variable.h"
 #include "node.h"
 
 /* Lattice for abstract intepreration */
@@ -471,6 +474,12 @@ new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 }
 
 static HIR*
+dup_lvar(hpc_state *p, HIR *lvar)
+{
+  return cons(lvar->car, lvar->cdr);
+}
+
+static HIR*
 new_gvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 {
   HIR *var = cons((HIR*)HIR_GVAR, hirsym(sym));
@@ -546,7 +555,7 @@ new_ifelse(hpc_state *p, HIR* cond, HIR* ifthen, HIR* ifelse)
   if (ifelse) {
     hir->lat = lat_join(p->mrb, ifthen->lat, ifelse->lat);
   } else {
-    hir->lat = lat_clone(p->mrb, ifthen->lat);
+    hir->lat = lat_join(p->mrb, ifthen->lat, mrb_nil_value());
   }
   return hir;
 }
@@ -571,7 +580,8 @@ static HIR*
 new_assign(hpc_state *p, HIR *lhs, HIR *rhs)
 {
   HIR *hir = list3((HIR*)HIR_ASSIGN, lhs, rhs);
-  lhs->lat = lat_join(p->mrb, lhs->lat, rhs->lat); /* FIXME: bug here */
+  mrb_p(p->mrb, lhs->lat);
+  lhs->lat = lat_join(p->mrb, lhs->lat, rhs->lat);
   hir->lat = rhs->lat;
   return hir;
 }
@@ -721,6 +731,18 @@ hpc_error(hpc_scope *s, const char *message)
   longjmp(s->jmp, 1);
 }
 
+static HIR*
+lookup_lvar(hpc_scope *s, mrb_sym sym)
+{
+  HIR *lv = s->lv;
+  while (lv) {
+    if (sym(lv->car->cdr) == sym)
+      return lv->car;
+    lv = lv->cdr;
+  }
+  NOT_REACHABLE();
+}
+
 static double
 readint_float(hpc_scope *s, const char *p, int base)
 {
@@ -789,7 +811,6 @@ readint_mrb_int(hpc_scope *s, const char *p, int base, int neg, int *overflow)
   return result;
 }
 
-
 static hpc_scope*
 scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
 {
@@ -797,14 +818,14 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
   mrb_pool *pool = mrb_pool_open(p->mrb);
   hpc_scope *s = (hpc_scope *)mrb_pool_alloc(pool, sizeof(hpc_scope));
 
-  if (!s) hpc_error(s, "mrb_pool_alloc failed");
+  if (!s) hpc_error(prev, "mrb_pool_alloc failed");
   *s = hpc_scope_zero;
   s->hpc = p;
   s->mrb = p->mrb;
   s->mpool = pool;
 
-  s->current_self = cons((HIR*)HIR_LVAR, hirsym(mrb_intern_cstr(p->mrb, "__self__")));
-  s->current_self->lat = lat_unknown;
+  s->current_self = new_lvar(p, mrb_intern_cstr(p->mrb, "__self__"),
+      mrb_top_self(p->mrb));
 
   if (!prev) return s;
 
@@ -838,6 +859,88 @@ scope_finish(hpc_scope *s)
   mrb_pool_close(s->mpool);
 }
 
+static hpc_scope*
+scope_dup(hpc_scope *s)
+{
+  hpc_state *p = s->hpc;
+  mrb_pool *pool = mrb_pool_open(p->mrb);
+  hpc_scope *s2 = (hpc_scope *)mrb_pool_alloc(pool, sizeof(hpc_scope));
+  if (!s2) hpc_error(s, "mrb_pool_alloc failed");
+
+  memcpy(s2, s, sizeof(hpc_scope));
+
+  s2->mpool = pool;
+
+  /* TODO: clone state of global and instance variables */
+
+  HIR *new_lv = 0, *last = 0, *lv = s->lv;
+  while (lv) {
+    if (!new_lv)
+      new_lv = last = cons(dup_lvar(p, lv->car), 0);
+    else
+      last->cdr = cons(dup_lvar(p, lv->car), 0);
+    lv = lv->cdr;
+  }
+
+  s2->lv = new_lv;
+  s2->ai = mrb_gc_arena_save(p->mrb);
+  return s2;
+}
+
+static void
+join_scope(hpc_scope *s1, hpc_scope *s2)
+{
+  HIR *lv1;
+  HIR *lv2;
+
+  /* TODO: merge global and instance variables */
+
+  lv1 = s1->lv;
+  lv2 = s2->lv;
+
+  while (lv1) {
+    mrb_value lat1, lat2;
+    int unknown1, unknown2;
+    lat1 = lv1->car->lat;
+    lat2 = lv2->car->lat;
+
+    unknown1 = LAT_HAS_TYPE(s1->mrb, lat1, LAT_UNKNOWN);
+    unknown2 = LAT_HAS_TYPE(s2->mrb, lat2, LAT_UNKNOWN);
+
+    if (unknown1 != unknown2) {
+      if (unknown1)
+        lat1 = mrb_nil_value();
+      else
+        lat2 = mrb_nil_value();
+    }
+
+    lv1->car->lat = lat_join(s1->mrb, lat1, lat2);
+    lv1 = lv1->cdr;
+    lv2 = lv2->cdr;
+  }
+  scope_finish(s2);
+}
+
+static struct RProc*
+search_abst_interp(mrb_state *mrb, struct RClass *klass, mrb_sym mid)
+{
+  struct RProc *m;
+  m = mrb_method_search_vm(mrb, &klass, mid);
+  if (!m) {
+    /* TODO: emulate method_missing */
+    NOT_IMPLEMENTED();
+  }
+  if (MRB_PROC_CFUNC_P(m)) {
+    m = get_interp(m);
+    if (!m)
+      mrb_raisef(mrb, E_NOTIMP_ERROR, "Abstract interpreter for %S",
+          mrb_symbol_value(mid));
+    return m;
+  } else {
+    NOT_IMPLEMENTED();
+  }
+}
+
 static void
 add_def(hpc_scope *s, node *tree)
 {
@@ -851,6 +954,8 @@ static HIR*
 infer_type(hpc_state *p, mrb_value lat)
 {
   /* TODO: infer type from lattice */
+  puts("Infer type:");
+  mrb_p(p->mrb, lat);
   return value_type;
 }
 
@@ -906,9 +1011,179 @@ typing_scope(hpc_scope *s, node *tree)
 }
 
 static HIR*
+typing_args(hpc_scope *s, node *args)
+{
+  int n = 0;
+  HIR *hir = 0, *last = 0;
+  hpc_state *p = s->hpc;
+  while (args) {
+    if (n >= 127 || (intptr_t)args->car->car == NODE_SPLAT) {
+      /* splat mode */
+      NOT_IMPLEMENTED();
+    }
+    /* normal mode */
+
+    if (hir)
+      last->cdr = cons(typing(s, args->car), 0);
+    else
+      hir = last = cons(typing(s, args->car), 0);
+    n++;
+    args = args->cdr;
+  }
+  return hir;
+}
+
+#define PRIMCALL_ARGC_MAX 16
+
+static HIR *
+typing_prim_call(hpc_scope *s, struct RProc *interp, HIR *recv, mrb_sym mid, HIR *args, node *blk)
+{
+  mrb_value *argv, argv_s[PRIMCALL_ARGC_MAX];
+  mrb_value ret;
+  int i, argc = hir_len(args);
+
+  if (argc > PRIMCALL_ARGC_MAX)
+    argv = (mrb_value *)mrb_malloc(s->mrb, sizeof(mrb_value)*argc);
+  else
+    argv = argv_s;
+
+  for (i = 0; i < argc; i++) {
+    argv[i] = args->car->lat;
+    args = args->cdr;
+  }
+
+  if (blk)
+    NOT_IMPLEMENTED();
+
+  ret = mrb_proccall_with_block(s->mrb, recv->lat, interp, mid, argc, argv, mrb_nil_value());
+  mrb_p(s->mrb, ret);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_add(hpc_scope *s, HIR *recv, HIR *args)
+{
+  hpc_assert(!args->cdr);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_sub(hpc_scope *s, HIR *recv, HIR *args)
+{
+  hpc_assert(!args->cdr);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_mul(hpc_scope *s, HIR *recv, HIR *args)
+{
+  hpc_assert(!args->cdr);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_div(hpc_scope *s, HIR *recv, HIR *args)
+{
+  hpc_assert(!args->cdr);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_lt(hpc_scope *s, HIR *recv, HIR *args)
+{
+  hpc_assert(!args->cdr);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_ltasgn(hpc_scope *s, HIR *recv, HIR *args)
+{
+  hpc_assert(!args->cdr);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_gt(hpc_scope *s, HIR *recv, HIR *args)
+{
+  hpc_assert(!args->cdr);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_gtasgn(hpc_scope *s, HIR *recv, HIR *args)
+{
+  hpc_assert(!args->cdr);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_prim_equal(hpc_scope *s, HIR *recv, HIR *args)
+{
+  hpc_assert(!args->cdr);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
+typing_call0(hpc_scope *s, struct RClass *klass, HIR *recv, mrb_sym mid, HIR *args,
+    node *blk)
+{
+  struct RProc *interp = 0;
+  size_t len;
+  const char *name = mrb_sym2name_len(s->mrb, mid, &len);
+
+  mrb_p(s->mrb, recv->lat);
+  mrb_p(s->mrb, mrb_symbol_value(mid));
+  mrb_p(s->mrb, mrb_obj_value(klass));
+
+  if (len == 1 && name[0] == '+')
+    return typing_prim_add(s, recv, args);
+  else if (len == 1 && name[0] == '-')
+    return typing_prim_sub(s, recv, args);
+  else if (len == 1 && name[0] == '*')
+    return typing_prim_mul(s, recv, args);
+  else if (len == 1 && name[0] == '/')
+    return typing_prim_div(s, recv, args);
+  else if (len == 1 && name[0] == '<')
+    return typing_prim_lt(s, recv, args);
+  else if (len == 2 && name[0] == '<' && name[1] == '=')
+    return typing_prim_ltasgn(s, recv, args);
+  else if (len == 1 && name[0] == '>')
+    return typing_prim_gt(s, recv, args);
+  else if (len == 2 && name[0] == '>' && name[1] == '=')
+    return typing_prim_gtasgn(s, recv, args);
+  else if (len == 2 && name[0] == '=' && name[1] == '=')
+    return typing_prim_equal(s, recv, args);
+
+  interp = search_abst_interp(s->mrb, klass, mid);
+  if (interp)
+    return typing_prim_call(s, interp, recv, mid, args, blk);
+  NOT_IMPLEMENTED();
+}
+
+static HIR*
 typing_call(hpc_scope *s, node *tree)
 {
+  mrb_sym sym = sym(tree->cdr->car);
   HIR *recv = typing(s, tree->car);
+  HIR *args = 0;
+  node *blk = 0;
+
+  tree = tree->cdr->cdr->car;
+  if (tree) {
+    /* TODO: splat mode */
+    args = typing_args(s, tree->car);
+  }
+  if (tree && tree->cdr) {
+    blk = tree->cdr;
+  }
+
+  if (!LAT_P(s->mrb, recv->lat))
+    return typing_call0(s, mrb_class(s->mrb, recv->lat), recv, sym, args, blk);
+
+  mrb_p(s->mrb, recv->lat);
+
+  NOT_IMPLEMENTED();
+#if 0
   mrb_sym name = sym(tree->cdr->car);
   hpc_state *p = s->hpc;
   HIR *args, *last, *arg;
@@ -931,8 +1206,8 @@ typing_call(hpc_scope *s, node *tree)
     }
   }
 
-
   return cons((HIR*)HIR_CALL, cons(hirsym(name), args));
+#endif
 }
 
 static HIR*
@@ -942,6 +1217,7 @@ typing(hpc_scope *s, node *tree)
   hpc_state *p = s->hpc;
   s->lineno = tree->lineno;
   int type = (intptr_t)tree->car;
+  //parser_dump(p->mrb, tree, 0);
   tree = tree->cdr;
   switch (type) {
     case NODE_SCOPE:
@@ -985,12 +1261,18 @@ typing(hpc_scope *s, node *tree)
       add_def(s, tree);
       return new_empty(p);
     case NODE_IF:
-      return new_ifelse(p,
-                        typing(s, tree->car),
-                        typing(s, tree->cdr->car),
-                        typing(s, tree->cdr->cdr->car));
+      {
+        HIR *ifthen = 0, *ifelse = 0, *cond = typing(s, tree->car);
+        hpc_scope *s2 = scope_dup(s);
+        if (tree->cdr->car)
+          ifthen = typing(s, tree->cdr->car);
+        if (tree->cdr->cdr->car)
+          ifelse = typing(s2, tree->cdr->cdr->car);
+        join_scope(s, s2);
+        return new_ifelse(p, cond, ifthen, ifelse);
+      }
     case NODE_LVAR:
-      return new_lvar(p, sym(tree), lat_unknown);
+      return lookup_lvar(s, sym(tree));
     case NODE_SELF:
       return s->current_self;
     case NODE_RETURN:

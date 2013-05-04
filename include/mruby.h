@@ -192,6 +192,7 @@ int mrb_get_args(mrb_state *mrb, const char *format, ...);
 mrb_value mrb_funcall(mrb_state*, mrb_value, const char*, int,...);
 mrb_value mrb_funcall_argv(mrb_state*, mrb_value, mrb_sym, int, mrb_value*);
 mrb_value mrb_funcall_with_block(mrb_state*, mrb_value, mrb_sym, int, mrb_value*, mrb_value);
+mrb_value mrb_proccall_with_block(mrb_state*, mrb_value, struct RProc*, mrb_sym, int, mrb_value*, mrb_value);
 mrb_sym mrb_intern_cstr(mrb_state*,const char*);
 mrb_sym mrb_intern2(mrb_state*,const char*,size_t);
 mrb_sym mrb_intern_str(mrb_state*,mrb_value);
