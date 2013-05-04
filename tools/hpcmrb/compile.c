@@ -1184,6 +1184,7 @@ hpc_compile_file(hpc_state *s, FILE *rfp, mrbc_context *c)
 
   mrb_state *mrb = s->mrb;  /* It is necessary for E_SYNTAX_ERROR macro */
   parser_state *p = mrb_parse_file(s->mrb, rfp, c);
+  HIR *ret;
 
   if (!p) return 0;
   if (!p->tree || p->nerr) {
@@ -1204,8 +1205,9 @@ hpc_compile_file(hpc_state *s, FILE *rfp, mrbc_context *c)
     }
   }
 
+  ret = compile(s, p->tree);
   mrb_parser_free(p);
-  return compile(s, p->tree);
+  return ret;
 }
 
 void
