@@ -735,18 +735,6 @@ hpc_error(hpc_scope *s, const char *message)
   longjmp(s->jmp, 1);
 }
 
-static HIR*
-lookup_lvar(hpc_scope *s, mrb_sym sym)
-{
-  HIR *lv = s->lv;
-  while (lv) {
-    if (sym(lv->car->cdr) == sym)
-      return lv->car;
-    lv = lv->cdr;
-  }
-  NOT_REACHABLE();
-}
-
 static double
 readint_float(hpc_scope *s, const char *p, int base)
 {
@@ -992,6 +980,15 @@ find_var_list(hpc_state *p, HIR *list, mrb_sym needle)
     list = list->cdr;
   }
   return 0;
+}
+
+static HIR*
+lookup_lvar(hpc_scope *s, mrb_sym sym)
+{
+  HIR* var = find_var_list(s->hpc, s->lv, sym);
+  if (!var)
+    NOT_REACHABLE();
+  return var;
 }
 
 static HIR*
