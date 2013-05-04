@@ -476,7 +476,9 @@ new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 static HIR*
 dup_lvar(hpc_state *p, HIR *lvar)
 {
-  return cons(lvar->car, lvar->cdr);
+  HIR *hir = cons(lvar->car, lvar->cdr);
+  hir->lat = lat_clone(p->mrb, lvar->lat);
+  return hir;
 }
 
 static HIR*
@@ -552,10 +554,14 @@ new_ifelse(hpc_state *p, HIR* cond, HIR* ifthen, HIR* ifelse)
 {
 
   HIR *hir = list4((HIR*)HIR_IFELSE, cond, ifthen, ifelse);
-  if (ifelse) {
+  if (ifthen && ifelse) {
     hir->lat = lat_join(p->mrb, ifthen->lat, ifelse->lat);
-  } else {
+  } else if (ifthen) {
     hir->lat = lat_join(p->mrb, ifthen->lat, mrb_nil_value());
+  } else if (ifelse) {
+    hir->lat = lat_join(p->mrb, ifelse->lat, mrb_nil_value());
+  } else {
+    NOT_REACHABLE();
   }
   return hir;
 }
@@ -731,18 +737,6 @@ hpc_error(hpc_scope *s, const char *message)
   longjmp(s->jmp, 1);
 }
 
-static HIR*
-lookup_lvar(hpc_scope *s, mrb_sym sym)
-{
-  HIR *lv = s->lv;
-  while (lv) {
-    if (sym(lv->car->cdr) == sym)
-      return lv->car;
-    lv = lv->cdr;
-  }
-  NOT_REACHABLE();
-}
-
 static double
 readint_float(hpc_scope *s, const char *p, int base)
 {
@@ -877,8 +871,10 @@ scope_dup(hpc_scope *s)
   while (lv) {
     if (!new_lv)
       new_lv = last = cons(dup_lvar(p, lv->car), 0);
-    else
+    else {
       last->cdr = cons(dup_lvar(p, lv->car), 0);
+      last = last->cdr;
+    }
     lv = lv->cdr;
   }
 
@@ -988,6 +984,15 @@ find_var_list(hpc_state *p, HIR *list, mrb_sym needle)
     list = list->cdr;
   }
   return 0;
+}
+
+static HIR*
+lookup_lvar(hpc_scope *s, mrb_sym sym)
+{
+  HIR* var = find_var_list(s->hpc, s->lv, sym);
+  if (!var)
+    NOT_REACHABLE();
+  return var;
 }
 
 static HIR*

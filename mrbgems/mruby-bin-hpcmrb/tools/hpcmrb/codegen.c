@@ -397,10 +397,14 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       PUTS("if (");
       put_exp(c, CADR(stat));
       PUTS(")\n");
-      INDENT_PP;
-      put_statement(c, CADDR(stat), FALSE);
-      INDENT_MM;
+      if (CADDR(stat)) {
+        put_statement(c, CADDR(stat), FALSE);
+      } else {
+        PUTS_INDENT;
+        PUTS("{}\n");
+      }
       if (CADDDR(stat)) {
+        PUTS_INDENT;
         PUTS("else");
         put_statement(c, CADDDR(stat), FALSE);
       }
