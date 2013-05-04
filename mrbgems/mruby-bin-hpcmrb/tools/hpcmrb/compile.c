@@ -476,7 +476,9 @@ new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 static HIR*
 dup_lvar(hpc_state *p, HIR *lvar)
 {
-  return cons(lvar->car, lvar->cdr);
+  HIR *hir = cons(lvar->car, lvar->cdr);
+  hir->lat = lat_clone(p->mrb, lvar->lat);
+  return hir;
 }
 
 static HIR*
