@@ -1,0 +1,2 @@
+a = "foobar"
+puts a
