@@ -1168,27 +1168,7 @@ typing_call0(hpc_scope *s, struct RClass *klass, HIR *recv, mrb_sym mid, HIR *ar
 static HIR*
 typing_call(hpc_scope *s, node *tree)
 {
-  mrb_sym sym = sym(tree->cdr->car);
   HIR *recv = typing(s, tree->car);
-  HIR *args = 0;
-  node *blk = 0;
-
-  tree = tree->cdr->cdr->car;
-  if (tree) {
-    /* TODO: splat mode */
-    args = typing_args(s, tree->car);
-  }
-  if (tree && tree->cdr) {
-    blk = tree->cdr;
-  }
-
-  if (!LAT_P(s->mrb, recv->lat))
-    return typing_call0(s, mrb_class(s->mrb, recv->lat), recv, sym, args, blk);
-
-  mrb_p(s->mrb, recv->lat);
-
-  NOT_IMPLEMENTED();
-#if 0
   mrb_sym name = sym(tree->cdr->car);
   hpc_state *p = s->hpc;
   HIR *args, *last, *arg;
@@ -1211,8 +1191,8 @@ typing_call(hpc_scope *s, node *tree)
     }
   }
 
+
   return cons((HIR*)HIR_CALL, cons(hirsym(name), args));
-#endif
 }
 
 static HIR*
