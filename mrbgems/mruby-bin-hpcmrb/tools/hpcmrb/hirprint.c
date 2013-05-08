@@ -138,12 +138,12 @@ void put_vardecl(hpc_hirprint_context *c, struct HIR* tree, char *vartype)
   put_type(c, CADR(tree));
   PUTS(" ");
   put_symbol(c, CADDR(tree));
-  
+
   if(CADDDR(tree)){
     PUTS(" ");
     put_statement(c, CADDDR(tree));
   }
-  
+
   PUTS(")");
   INDENT_MM;
 }
@@ -162,7 +162,7 @@ put_decl(hpc_hirprint_context *c, HIR *decl)
     PUTS(")");
     return;
   case HIR_LVARDECL:
-    PUTS("(:HIR_LVARDECL ");    
+    PUTS("(:HIR_LVARDECL ");
     put_variable(c, decl->cdr);
     if (TYPE(CADDDR(decl)) != HIR_EMPTY) {
       put_exp(c, CADDDR(decl));
@@ -277,13 +277,13 @@ put_exp(hpc_hirprint_context *c, HIR *exp)
       char buff[32];
       PUTS("(:HIR_FLOAT ");
       PUTS((char *)CADR(exp));
-      sprintf(buff, " %d)", (int)(intptr_t)CADDR(exp));      
+      sprintf(buff, " %d)", (int)(intptr_t)CADDR(exp));
       PUTS(buff);
     }
     return;
   case HIR_STRING:
     {
-      char len[32];      
+      char len[32];
       PUTS("(:HIR_STRING ");
       PUTS((char *)CADR(exp));
       sprintf(len, " %d)", (int)(intptr_t)CADDR(exp));
@@ -328,7 +328,7 @@ put_exp(hpc_hirprint_context *c, HIR *exp)
     PUTS("\n");
     put_exp(c, CADDDR(exp));
     PUTS(")");
-    INDENT_MM;    
+    INDENT_MM;
     return;
   case HIR_INIT_LIST:
     PUTS("(:HIR_INIT_LIST ");
@@ -356,7 +356,7 @@ put_exp(hpc_hirprint_context *c, HIR *exp)
           PUTS(" ");
         exps = exps->cdr;
       }
-      INDENT_MM;      
+      INDENT_MM;
       PUTS(")");
     }
     return;
@@ -386,7 +386,7 @@ put_statement(hpc_hirprint_context *c, HIR *stat)
         PUTS("\n");
         put_statement(c, inner_stat);
         PUTS(")");
-        INDENT_MM;        
+        INDENT_MM;
       }
       return;
     case HIR_BLOCK:
@@ -409,7 +409,7 @@ put_statement(hpc_hirprint_context *c, HIR *stat)
       PUTS("(:HIR_ASSIGN ");
       hpc_assert(TYPE(CADR(stat)) == HIR_LVAR
                  || TYPE(CADR(stat)) == HIR_GVAR);
-      INDENT_PP;      
+      INDENT_PP;
       put_symbol(c, CADR(stat)->cdr);
       PUTS("\n");
       put_exp(c, CADDR(stat));
@@ -422,11 +422,11 @@ put_statement(hpc_hirprint_context *c, HIR *stat)
       put_exp(c, CADR(stat));
 
       if (CADDR(stat)) {
-        PUTS("\n");        
+        PUTS("\n");
         put_statement(c, CADDR(stat));
       }
       if (CADDDR(stat)) {
-        PUTS("\n");        
+        PUTS("\n");
         put_statement(c, CADDDR(stat));
       }
       INDENT_MM;
@@ -483,14 +483,14 @@ put_statement(hpc_hirprint_context *c, HIR *stat)
       PUTS("(:HIR_CALL\n");
       INDENT_PP;
       put_exp(c, stat);
-      INDENT_MM;      
+      INDENT_MM;
       PUTS(")");
       return;
     default:
       NOT_REACHABLE();
   }
 }
-  
+
 mrb_value
 hpc_dump_hir(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
 {
