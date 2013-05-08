@@ -447,16 +447,19 @@ cons_gen(hpc_state *p, HIR *car, HIR *cdr)
 #define list4(a,b,c,d)    cons((a), cons((b), cons((c), cons((d), 0))))
 #define list5(a,b,c,d,e)  cons((a), cons((b), cons((c), cons((d), cons((e), 0)))))
 
+void dump_varlist(mrb_state *mrb, HIR *list);
+
 static HIR*
 append(hpc_state *p, HIR *list1, HIR *list2)
 {
+  HIR *orig_list1 = list1;
   if (!list1)
     return list2;
 
   while (list1->cdr)
     list1 = list1->cdr;
   list1->cdr = list2;
-  return list1;
+  return orig_list1;
 }
 
 static mrb_sym
@@ -1263,7 +1266,7 @@ find_params(node *params, mrb_sym sym)
     scope is not closed, if you do not need scope, close it
  */
 static HIR*
-typing_block(hpc_scope *prev_scope, node *lv_tree, node *margs, node *n_body)
+typing_block(hpc_scope *prev_scope, node *lv_tree, node *margs, node *n_body, int inherit_lvar)
 {
   hpc_state *p = prev_scope->hpc;
   hpc_scope *scope;
@@ -1281,7 +1284,7 @@ typing_block(hpc_scope *prev_scope, node *lv_tree, node *margs, node *n_body)
     lv_tree = lv_tree->cdr;
   }
 
-  scope = scope_new(p, prev_scope, lv, TRUE, FALSE);
+  scope = scope_new(p, prev_scope, lv, TRUE, inherit_lvar);
   body = new_scope(p, lvs_to_decls(p, non_pv_lv), typing(scope, n_body));
 
   return cons((HIR*)scope, body);
@@ -1315,7 +1318,7 @@ typing_call_raw(hpc_scope *s, mrb_sym name, HIR *args_prefix, node *tree, HIR *a
       mrb_sym counter = sym(tree->cdr->cdr->car->car);
       hpc_state *p = s->hpc;
 
-      HIR * result = typing_block(s, tree->cdr->cdr->car, tree->cdr->cdr->cdr->car->car, tree->cdr->cdr->cdr->cdr->car);
+      HIR * result = typing_block(s, tree->cdr->cdr->car, tree->cdr->cdr->cdr->car->car, tree->cdr->cdr->cdr->cdr->car, TRUE);
       scope_finish((hpc_scope *)result->car);
 
       hir = list5((HIR *)HIR_DOALL, hirsym(counter), new_int_const(p, 0), recv, result->cdr);
@@ -1553,7 +1556,7 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
   hpc_scope *scope;
   mrb_sym self_sym;
 
-  HIR *result = typing_block(prev_scope, lv_tree, mandatory_params, n_body);
+  HIR *result = typing_block(prev_scope, lv_tree, mandatory_params, n_body, FALSE);
 
   scope = (hpc_scope *)result->car;
   self_sym = sym(scope->current_self->cdr);
