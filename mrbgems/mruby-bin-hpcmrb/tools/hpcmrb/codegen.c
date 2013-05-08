@@ -11,6 +11,8 @@
 #define DECLP(t) (t == HIR_GVARDECL || t == HIR_LVARDECL || \
                   t == HIR_PVARDECL)
 
+#define sym(x) ((mrb_sym)(intptr_t)(x))
+
 #define PUTS(str) (fputs((str), c->wfp))
 #define PUTS_INDENT {                           \
     int __i;                                    \
@@ -181,7 +183,7 @@ put_operator_name(hpc_codegen_context *c, mrb_sym sym)
 {
   size_t len;
   int i;
-  const char *name = mrb_sym2name_len(c->mrb, (mrb_sym)(intptr_t)sym, &len);
+  const char *name = mrb_sym2name_len(c->mrb, sym(sym), &len);
   static const char table[][2][32] = {
     {"+", "num_add"},
     {"-", "num_sub"},
@@ -211,7 +213,7 @@ static int
 put_invalid_name(hpc_codegen_context *c, mrb_sym sym)
 {
   size_t len;
-  const char *name = mrb_sym2name_len(c->mrb, (mrb_sym)(intptr_t)sym, &len);
+  const char *name = mrb_sym2name_len(c->mrb, sym(sym), &len);
 
   if (name[len-1] == '=') {
     char new_name[32];
@@ -228,8 +230,8 @@ put_invalid_name(hpc_codegen_context *c, mrb_sym sym)
 static void
 put_function_name(hpc_codegen_context *c, HIR *sym)
 {
-  if (! put_operator_name(c, (mrb_sym)(intptr_t)sym) &&
-      ! put_invalid_name(c, (mrb_sym)(intptr_t)sym)) {
+  if (! put_operator_name(c, sym(sym)) &&
+      ! put_invalid_name(c, sym(sym))) {
     put_symbol(c, sym);
   }
 }
@@ -511,13 +513,38 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
         HIR *low  = CADDR(stat);
         HIR *high = CADDDR(stat);
         HIR *sym = CADR(stat);
+        char counter[32], last[32];
 
+        sprintf(counter, "__%s", mrb_sym2name(c->mrb, sym(sym)));
+        sprintf(last, "__%s_last", mrb_sym2name(c->mrb, sym(sym)));
+
+        if (!no_brace) {
+          INDENT_PP;
+          PUTS_INDENT;
+          PUTS("{\n");
+        }
         PUTS_INDENT;
-        PUTS("for (");
-        put_symbol(c, sym); PUTS(" = "); put_exp(c, low); PUTS("; ");
-        put_symbol(c, sym); PUTS(" < "); put_exp(c, high); PUTS("; ");
-        PUTS("++"); put_symbol(c, sym); PUTS(")\n");
-        put_statement(c, CADDDDR(stat), FALSE);
+        PUTS("mrb_int "); PUTS(counter); PUTS(" = ");
+        PUTS("mrb_fixnum("); put_exp(c, low); PUTS(");\n");
+        PUTS_INDENT;
+        PUTS("mrb_int "); PUTS(last); PUTS(" = ");
+        PUTS("mrb_fixnum("); put_exp(c, high); PUTS(");\n");
+        PUTS_INDENT;
+        PUTS("for (; ");
+        PUTS(counter); PUTS(" < "); PUTS(last); PUTS("; ");
+        PUTS("++"); PUTS(counter); PUTS(") {\n");
+        INDENT_PP;
+        PUTS_INDENT;
+        PUTS("mrb_value "); put_symbol(c, sym); PUTS(" = "); PUTS("mrb_fixnum_value("); PUTS(counter); PUTS(");\n");
+        put_statement(c, CADDDDR(stat), TRUE);
+        INDENT_MM;
+        PUTS_INDENT;
+        PUTS("}\n");
+        if (!no_brace) {
+          INDENT_MM;
+          PUTS_INDENT;
+          PUTS("}\n");
+        }
       }
       return;
     case HIR_WHILE:
