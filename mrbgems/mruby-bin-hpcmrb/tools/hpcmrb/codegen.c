@@ -41,6 +41,47 @@ put_header(hpc_codegen_context *c)
 }
 
 static void
+puts_noescape(hpc_codegen_context *c, const char *str)
+{
+  int i = 0;
+  int len = strlen(str);
+  for (i = 0; i < len; ++i) {
+    switch (str[i]) {
+    case '\a':
+      PUTS("\\a");
+      break;
+    case '\b':
+      PUTS("\\b");
+      break;
+    case 'f':
+      PUTS("\f");
+      break;
+    case '\n':
+      PUTS("\\n");
+      break;
+    case '\r':
+      PUTS("\\r");
+      break;
+    case '\t':
+      PUTS("\\t");
+      break;
+    case '\\':
+      PUTS("\\\\");
+      break;
+    case '\"':
+      PUTS("\\\"");
+      break;
+    case '\'':
+      PUTS("\\\'");
+      break;
+    default:
+      putc(str[i], c->wfp);
+      break;
+    }
+  }
+}
+
+static void
 put_type(hpc_codegen_context *c, HIR *kind)
 {
   enum hir_type_kind k = (intptr_t)kind->car;
@@ -255,7 +296,7 @@ put_exp(hpc_codegen_context *c, HIR *exp)
     case HIR_STRING:
 
       PUTS("mrb_str_new(mrb, \"");
-      PUTS((char *)CADR(exp));
+      puts_noescape(c, (char *)CADR(exp));
       PUTS("\", ");
       {
         char len[32];
