@@ -1,5 +1,6 @@
 #include "hpcmrb.h"
 #include <stdint.h>
+#include <string.h>
 
 #define CADR(x) ((x)->cdr->car)
 #define CADDR(x) ((x)->cdr->cdr->car)
@@ -134,43 +135,41 @@ put_variable(hpc_codegen_context *c, HIR *hir)
   }
 }
 
+static int
+put_name_for_sym(hpc_codegen_context *c, mrb_sym sym)
+{
+  size_t len;
+  int i;
+  const char *name = mrb_sym2name_len(c->mrb, (mrb_sym)(intptr_t)sym, &len);
+  static const char table[][2][32] = {
+    {"+", "num_add"},
+    {"-", "num_sub"},
+    {"*", "num_mul"},
+    {"/", "num_div"},
+    {"<", "num_lt"},
+    {"<=", "num_le"},
+    {">", "num_gt"},
+    {">=", "num_ge"},
+    {"==", "num_eq"},
+    {"!", "mrb_bob_not"},
+    {"[]", "mrb_ary_aget"},
+    {"[]=", "mrb_ary_aset"},
+    {"", ""}
+  };
+
+  for (i = 0; strlen(table[i][0]); ++i) {
+    if (strlen(table[i][0]) == len && strncmp(table[i][0], name, len) == 0) {
+      PUTS(table[i][1]);
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static void
 put_function_name(hpc_codegen_context *c, HIR *sym)
 {
-  size_t len;
-  const char *name = mrb_sym2name_len(c->mrb, (mrb_sym)(intptr_t)sym, &len);
-
-  if (len == 1 && name[0] == '+')  {
-    PUTS("num_add");
-  }
-  else if (len == 1 && name[0] == '-')  {
-    PUTS("num_sub");
-  }
-  else if (len == 1 && name[0] == '*')  {
-    PUTS("num_mul");
-  }
-  else if (len == 1 && name[0] == '/')  {
-    PUTS("num_div");
-  }
-  else if (len == 1 && name[0] == '<')  {
-    PUTS("num_lt");
-  }
-  else if (len == 2 && name[0] == '<' && name[1] == '=')  {
-    PUTS("num_le");
-  }
-  else if (len == 1 && name[0] == '>')  {
-    PUTS("num_gt");
-  }
-  else if (len == 2 && name[0] == '>' && name[1] == '=')  {
-    PUTS("num_ge");
-  }
-  else if (len == 2 && name[0] == '=' && name[1] == '=')  {
-    PUTS("num_eq");
-  }
-  else if (len == 1 && name[0] == '!')  {
-    PUTS("mrb_bob_not");
-  }
-  else {
+  if (! put_name_for_sym(c, (mrb_sym)(intptr_t)sym)) {
     put_symbol(c, sym);
   }
 }

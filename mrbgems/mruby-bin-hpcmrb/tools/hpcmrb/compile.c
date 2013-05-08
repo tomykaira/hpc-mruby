@@ -447,6 +447,22 @@ cons_gen(hpc_state *p, HIR *car, HIR *cdr)
 #define list4(a,b,c,d)    cons((a), cons((b), cons((c), cons((d), 0))))
 #define list5(a,b,c,d,e)  cons((a), cons((b), cons((c), cons((d), cons((e), 0)))))
 
+static mrb_sym
+attrsym(hpc_state *p, mrb_sym a)
+{
+  const char *name;
+  size_t len;
+  char *name2;
+
+  name = mrb_sym2name_len(p->mrb, a, &len);
+  name2 = (char *)compiler_palloc(p, len+1);
+  memcpy(name2, name, len);
+  name2[len] = '=';
+  name2[len+1] = '\0';
+
+  return mrb_intern2(p->mrb, name2, len+1);
+}
+
 hpc_state*
 hpc_state_new(mrb_state *mrb)
 {
@@ -1166,22 +1182,20 @@ typing_call0(hpc_scope *s, struct RClass *klass, HIR *recv, mrb_sym mid, HIR *ar
 }
 
 static HIR*
-typing_call(hpc_scope *s, node *tree)
+typing_call_raw(hpc_scope *s, mrb_sym name, HIR *args_prefix, node *tree, HIR *args_suffix)
 {
-  HIR *recv = typing(s, tree->car);
-  mrb_sym name = sym(tree->cdr->car);
+  HIR *args, *last;
   hpc_state *p = s->hpc;
-  HIR *args, *last, *arg;
-  tree = tree->cdr->cdr->car;
 
-  arg = recv;
-  args = last = cons(arg, 0);
+  args = last = args_prefix;
+  while (last->cdr)
+    last = last->cdr;
 
   if (tree) {
+    /* mandatory arg */
     node *argtree = tree->car;
     while (argtree) {
-      arg = typing(s, argtree->car);
-      last->cdr = cons(arg, 0);
+      last->cdr = cons(typing(s, argtree->car), 0);
       last = last->cdr;
       argtree = argtree->cdr;
     }
@@ -1191,8 +1205,40 @@ typing_call(hpc_scope *s, node *tree)
     }
   }
 
+  last->cdr = args_suffix;
 
   return cons((HIR*)HIR_CALL, cons(hirsym(name), args));
+}
+
+static HIR*
+typing_call(hpc_scope *s, node *tree)
+{
+  HIR *recv = typing(s, tree->car);
+  mrb_sym name = sym(tree->cdr->car);
+  hpc_state *p = s->hpc;
+
+  return typing_call_raw(s, name, list1(recv), tree->cdr->cdr->car,  0);
+}
+
+static HIR*
+typing_assign(hpc_scope *s, node *tree)
+{
+  hpc_state *p = s->hpc;
+  node *lhs = tree->car;
+  HIR *rhs = typing(s, tree->cdr);
+  switch ((intptr_t)lhs->car) {
+  case NODE_GVAR:
+  case NODE_LVAR:
+  case NODE_CONST:
+    return new_assign(p, typing(s, lhs), rhs);
+  case NODE_CALL:
+    {
+      HIR *recv = typing(s, lhs->cdr->car);
+      return typing_call_raw(s, attrsym(p, sym(lhs->cdr->cdr->car)), list1(recv), lhs->cdr->cdr->cdr->car,  list1(rhs));
+    }
+  default:
+    NOT_IMPLEMENTED();
+  }
 }
 
 static HIR*
@@ -1266,7 +1312,7 @@ typing(hpc_scope *s, node *tree)
         return new_return_value(p, typing(s, c));
       }
     case NODE_ASGN:
-      return new_assign(p, typing(s, tree->car), typing(s, tree->cdr));
+      return typing_assign(s, tree);
     case NODE_CONST:
     case NODE_GVAR:
       {
