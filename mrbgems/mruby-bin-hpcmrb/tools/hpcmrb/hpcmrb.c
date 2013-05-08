@@ -248,6 +248,7 @@ main(int argc, char **argv)
     cleanup(mrb, &args);
     return EXIT_SUCCESS;
   }
+  hpc_dump_hir(p, args.wfp, hir, c);
   result = hpc_generate_code(p, args.wfp, hir, c);
   if (mrb_undef_p(result) || mrb_fixnum(result) < 0) {
     cleanup(mrb, &args);
