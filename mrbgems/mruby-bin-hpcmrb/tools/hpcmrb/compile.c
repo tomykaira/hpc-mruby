@@ -972,10 +972,9 @@ infer_type(hpc_state *p, mrb_value lat)
 }
 
 static HIR*
-lvs_to_decls(hpc_scope *s, HIR *lvs)
+lvs_to_decls(hpc_state *p, HIR *lvs)
 {
   HIR *lv_decls = 0;
-  hpc_state *p = s->hpc;
 
   while (lvs) {
     mrb_sym sym = sym(lvs->car->cdr);
@@ -1026,7 +1025,7 @@ typing_scope(hpc_scope *s, node *tree)
   }
 
   hpc_scope *scope = scope_new(p, s, lv, TRUE);
-  hir = new_scope(p, lvs_to_decls(scope, scope->lv), typing(scope, tree->cdr));
+  hir = new_scope(p, lvs_to_decls(p, scope->lv), typing(scope, tree->cdr));
   scope_finish(scope);
   return hir;
 }
@@ -1420,6 +1419,17 @@ insert_return_at_last(hpc_state *p, HIR *hir)
   }
 }
 
+static int
+find_params(node *params, mrb_sym sym)
+{
+  while (params) {
+    if (sym(params->car->cdr) == sym)
+      return TRUE;
+    params = params->cdr;
+  }
+  return FALSE;
+}
+
 static HIR*
 compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
 {
@@ -1427,17 +1437,24 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
   node *mandatory_params = ast->cdr->cdr->car->car;
   node *lv_tree = ast->cdr->car;
   node *n_body = ast->cdr->cdr->cdr->car;
-  HIR *params = 0, *body, *last, *param, *lv = 0;
+  HIR *params = 0, *body, *last, *param, *lv = 0, *non_pv_lv = 0;
   hpc_scope *scope;
 
   while (lv_tree) {
-    if (lv_tree->car)
-      lv = cons(new_lvar(p, sym(lv_tree->car), lat_unknown), lv);
+    if (lv_tree->car) {
+      mrb_sym sym = sym(lv_tree->car);
+      HIR *lvar = new_lvar(p, sym, lat_unknown);
+      lv = cons(lvar, lv);
+      if (!find_params(mandatory_params, sym)) {
+        non_pv_lv = cons(lvar, non_pv_lv);
+      }
+    }
     lv_tree = lv_tree->cdr;
   }
 
   scope = scope_new(p, prev_scope, lv, TRUE);
-  body = typing(scope, n_body);
+  body = new_scope(p, lvs_to_decls(p, non_pv_lv), typing(scope, n_body));
+
   body = insert_return_at_last(p, body);
 
   /*
