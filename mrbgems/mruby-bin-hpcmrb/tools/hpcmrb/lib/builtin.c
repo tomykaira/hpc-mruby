@@ -1,8 +1,18 @@
 #include "hpcmrb.h"
 #include "mruby.h"
 #include "mruby/value.h"
+#include "mruby/string.h"
+#include "mruby/array.h" /* mrb_ary_ref */
+#include <limits.h> /* CHAR_BIT macro */
+#include <string.h> /* memcpy */
 
 #define TYPES2(a,b) ((((uint16_t)(a))<<8)|(((uint16_t)(b))&0xff))
+
+mrb_value hpc_str_plus(mrb_value, mrb_value);
+extern struct RString* str_new(mrb_state *, const char *, int);/* defined in string.c, but not decleared in string.h (for hpc_str_plus)*/
+
+extern mrb_state *mrb; /* using mrb_state in the driver-main */
+
 
 mrb_value
 num_add(mrb_value a, mrb_value b)
@@ -26,6 +36,8 @@ num_add(mrb_value a, mrb_value b)
     return mrb_float_value(mrb_float(a) + (mrb_float)mrb_fixnum(b));
   case TYPES2(MRB_TT_FLOAT,MRB_TT_FLOAT):
     return mrb_float_value(mrb_float(a) + mrb_float(b));
+  case TYPES2(MRB_TT_STRING,MRB_TT_STRING):
+    return hpc_str_plus(a, b);
   default:
     NOT_REACHABLE();
   }
@@ -211,4 +223,114 @@ mrb_value
 num_ge(mrb_value a, mrb_value b)
 {
   OP_CMP(>=);
+}
+
+
+/* almost copied from string.c(mrb_str_plus) */
+mrb_value
+hpc_str_plus(mrb_value a, mrb_value b)
+{
+  struct RString *s = mrb_str_ptr(a);
+  struct RString *s2 = mrb_str_ptr(b);
+  struct RString *t;
+
+  t = str_new(mrb, 0, s->len + s2->len);
+  memcpy(t->ptr, s->ptr, s->len);
+  memcpy(t->ptr + s->len, s2->ptr, s2->len);
+
+  return mrb_obj_value(t);
+}
+
+/* almost copied from numeric.c(hpcmrb_fixnum_to_str) */
+mrb_value
+hpc_fixnum_to_str(mrb_value x, int base)
+{
+  char buf[sizeof(mrb_int)*CHAR_BIT+1];
+  char *b = buf + sizeof buf;
+  mrb_int val = mrb_fixnum(x);
+
+  if (base < 2 || 36 < base) {
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "invalid radix %S", mrb_fixnum_value(base));
+  }
+
+  if (val == 0) {
+    *--b = '0';
+  } else if (val < 0) {
+    do {
+      *--b = mrb_digitmap[-(val % base)];
+    } while (val /= base);
+    *--b = '-';
+  } else {
+    do {
+      *--b = mrb_digitmap[(int)(val % base)];
+    } while (val /= base);
+  }
+
+  return mrb_str_new(mrb, b, buf + sizeof(buf) - b);
+}
+
+/* value n's type is expected to be <string> or <fixnum> */
+void
+hpc_puts(mrb_value __self__, mrb_value n)
+{
+  mrb_value str;
+
+  switch (mrb_type(n)) {
+  case MRB_TT_FIXNUM:
+    str = hpc_fixnum_to_str(n, 10);
+    break;
+  case MRB_TT_STRING:
+    str = n;
+    break;
+  default:
+    str = mrb_any_to_s(mrb, n);
+  }
+
+  const char *cstr = mrb_str_to_cstr(mrb, str);
+  /* calling c puts */
+  printf("%s\n", cstr);
+}
+
+void
+hpc_print(mrb_value __self__, mrb_value n)
+{
+  mrb_value str;
+
+  switch (mrb_type(n)) {
+  case MRB_TT_FIXNUM:
+    str = hpc_fixnum_to_str(n, 10);
+    break;
+  case MRB_TT_STRING:
+    str = n;
+    break;
+  default:
+    str = mrb_any_to_s(mrb, n);
+  }
+
+  const char *cstr = mrb_str_to_cstr(mrb, str);
+  /* calling c puts */
+  printf("%s", cstr);
+}
+
+
+mrb_value
+hpc_ary_aget(mrb_value __self__, mrb_value index)
+{
+  if(mrb_type(index) != MRB_TT_FIXNUM){
+    return mrb_ary_ref(mrb, __self__, mrb_fixnum(index));
+  }
+  puts("TYPE_ERROR: expected Fixnum for 1st argument (hpc_ary_aget)");
+  return mrb_nil_value(); /* dummy to avoid warning : not reach here */
+}
+
+mrb_value
+hpc_ary_aset(mrb_value __self__, mrb_value index, mrb_value value)
+{
+
+  if(mrb_type(index) != MRB_TT_FIXNUM){
+    mrb_ary_set(mrb, __self__, mrb_fixnum(index), value);
+    return value;
+  }
+  puts("TYPE_ERROR: expected Fixnum for 1st argument (hpc_ary_aset)");
+  return mrb_nil_value(); /* dummy to avoid warning : not reach here */
 }
