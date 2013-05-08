@@ -9,13 +9,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern int compiled_main(mrb_state *mrb);
+extern void compiled_main(mrb_value, mrb_state *);
+
+mrb_state *mrb;
 
 int
 main(int argc, char **argv)
 {
-  mrb_state *mrb = mrb_open();
-  int n = -1;
+  mrb = mrb_open();
+  int ret = -1;
+
+  /*
   int i;
   mrb_value ARGV;
 
@@ -32,9 +36,13 @@ main(int argc, char **argv)
     mrb_ary_push(mrb, ARGV, mrb_str_new(mrb, argv[i], strlen(argv[i])));
   }
   mrb_define_global_const(mrb, "ARGV", ARGV);
+  */
   /* mrb_gv_set(mrb, mrb_intern2(mrb, "$0", 2), ...) */
 
-  n = compiled_main(mrb);
+  compiled_main(mrb_fixnum_value(0), mrb);
 
-  return n == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+  mrb_close(mrb);
+
+  return ret;
+  /* return n == 0 ? EXIT_SUCCESS : EXIT_FAILURE; */
 }
