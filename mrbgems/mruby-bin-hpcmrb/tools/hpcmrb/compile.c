@@ -490,6 +490,14 @@ new_lvar(hpc_state *p, mrb_sym sym, mrb_value lat)
 }
 
 static HIR*
+new_ivar(hpc_state *p, mrb_sym sym)
+{
+  HIR *var = cons((HIR*)HIR_IVAR, hirsym(sym));
+  var->lat = lat_unknown;
+  return var;
+}
+
+static HIR*
 dup_lvar(hpc_state *p, HIR *lvar)
 {
   HIR *hir = cons(lvar->car, lvar->cdr);
@@ -642,6 +650,15 @@ new_prim(hpc_state *p, enum hir_primitive_type t)
   return hir;
 }
 
+/* FIXME: super is not supported now */
+static HIR*
+new_defclass(hpc_state *p, mrb_sym name, mrb_sym super)
+{
+  HIR *hir = list3((HIR*)HIR_DEFCLASS, hirsym(name), hirsym(super));
+  hir->lat = mrb_voidp_value(p->mrb->class_class);
+  return hir;
+}
+
 static HIR*
 new_simple_type(hpc_state *p, enum hir_type_kind kind)
 {
@@ -701,6 +718,7 @@ typedef struct scope {
   HIR *defs;
   int inherit_defs;
   HIR *lv;
+  HIR *iv;
   int sp;
 
   int lastlabel;
@@ -841,6 +859,7 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs)
 
   if (inherit_defs) {
     s->defs = prev->defs;
+    s->iv   = prev->iv;
   }
   s->inherit_defs = inherit_defs;
 
@@ -864,6 +883,7 @@ scope_finish(hpc_scope *s)
   mrb_state *mrb = s->mrb;
   if (s->inherit_defs) {
     s->prev->defs = s->defs;
+    s->prev->iv   = s->iv;
   }
   mrb_gc_arena_restore(mrb, s->ai);
   mrb_pool_close(s->mpool);
@@ -1008,6 +1028,25 @@ lookup_lvar(hpc_scope *s, mrb_sym sym)
   if (!var)
     NOT_REACHABLE();
   return var;
+}
+
+static HIR*
+lookup_ivar(hpc_scope *s, mrb_sym sym)
+{
+  hpc_state *p = s->hpc;
+  HIR* var = find_var_list(p, s->iv, sym);
+  if (!var) {
+    var = new_ivar(p, sym);
+    s->iv = cons(var, s->iv);
+  }
+  return var;
+}
+
+static void
+register_class_definition(hpc_state *p, mrb_sym name, node *tree)
+{
+  /* TODO: override (define the same class twice) */
+  p->classes = cons(cons(hirsym(name), (HIR *)tree), p->classes);
 }
 
 static HIR*
@@ -1229,6 +1268,7 @@ typing_assign(hpc_scope *s, node *tree)
   case NODE_GVAR:
   case NODE_LVAR:
   case NODE_CONST:
+  case NODE_IVAR:
     return new_assign(p, typing(s, lhs), rhs);
   case NODE_CALL:
     {
@@ -1303,6 +1343,8 @@ typing(hpc_scope *s, node *tree)
       }
     case NODE_LVAR:
       return lookup_lvar(s, sym(tree));
+    case NODE_IVAR:
+      return lookup_ivar(s, sym(tree));
     case NODE_SELF:
       return s->current_self;
     case NODE_RETURN:
@@ -1326,8 +1368,12 @@ typing(hpc_scope *s, node *tree)
       return new_empty(p);
       NOT_IMPLEMENTED();
     case NODE_CLASS:
-      return new_empty(p);
-      NOT_IMPLEMENTED();
+      {
+        HIR *rhs = new_defclass(p, sym(tree->car->cdr), 0);
+        register_class_definition(p, sym(tree->car->cdr), tree);
+        typing(s, tree->cdr->cdr->car->cdr); /* collect defs */
+        return new_assign(p, new_gvar(p, sym(tree->car->cdr), lat_unknown), rhs);
+      }
     case NODE_STR:
       return new_str(p, (char*)tree->car, (int)(intptr_t)tree->cdr);
     case NODE_AND:
@@ -1382,14 +1428,13 @@ insert_return_at_last(hpc_state *p, HIR *hir)
   case HIR_BLOCK:
     {
       HIR *last = hir->cdr->car;
-      hpc_assert(last->cdr);
       while (last->cdr)
         last = last->cdr;
       last->car = insert_return_at_last(p, last->car);
     }
     return hir;
   case HIR_ASSIGN:
-    return new_block(p, list2(hir, new_return_value(p, new_lvar(p, sym(hir->cdr->car), hir->lat))));
+    return new_block(p, list2(hir, new_return_value(p, hir->cdr->car)));
   case HIR_IFELSE:
     hir->cdr->cdr->car = insert_return_at_last(p, hir->cdr->cdr->car);
     hir->cdr->cdr->cdr->car = insert_return_at_last(p, hir->cdr->cdr->cdr->car);
@@ -1405,13 +1450,10 @@ insert_return_at_last(hpc_state *p, HIR *hir)
   case HIR_EMPTY:
     return new_return_void(p);
   case HIR_INT:
-    return new_return_value(p, hir);
   case HIR_FLOAT:
-    return new_return_value(p, hir);
   case HIR_LVAR:
-    return new_return_value(p, hir);
   case HIR_GVAR:
-    return new_return_value(p, hir);
+  case HIR_IVAR:
   case HIR_CALL:
     return new_return_value(p, hir);
   default:

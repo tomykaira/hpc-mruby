@@ -235,6 +235,17 @@ put_function_name(hpc_codegen_context *c, HIR *sym)
 }
 
 static void
+put_ivar_name(hpc_codegen_context *c, HIR *hir)
+{
+  mrb_sym sym = (intptr_t)hir;
+  const char * name = mrb_sym2name(c->mrb, sym);
+
+  PUTS("mrb_intern(mrb, \"");
+  PUTS(name + 1);                /* skip @ */
+  PUTS("\")");
+}
+
+static void
 put_decl(hpc_codegen_context *c, HIR *decl)
 {
   PUTS_INDENT;
@@ -328,6 +339,11 @@ put_exp(hpc_codegen_context *c, HIR *exp)
     case HIR_GVAR:
       put_symbol(c, exp->cdr);
       return;
+    case HIR_IVAR:
+      PUTS("mrb_iv_get(mrb, __self__, ");
+      put_ivar_name(c, exp->cdr);
+      PUTS(")");
+      break;
     case HIR_CALL:
       /* FIXME: expects
          - func is symbol
@@ -355,6 +371,12 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       PUTS(" : ");
       put_exp(c, CADDDR(exp));
       PUTS(" )");
+      return;
+    case HIR_DEFCLASS:
+      /* mrb_define_class(mrb, NAME, mrb->object_class) */
+      PUTS("mrb_define_class(mrb, ");
+      put_symbol(c, CADR(exp));
+      PUTS(", mrb->object_class)");
       return;
     case HIR_INIT_LIST:
       PUTS("{");
@@ -444,11 +466,21 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       /* lhs is HIR_LVAR or HIR_GVAR,
          rhs is exp */
       PUTS_INDENT;
-      hpc_assert(TYPE(CADR(stat)) == HIR_LVAR
-                 || TYPE(CADR(stat)) == HIR_GVAR);
-      put_symbol(c, CADR(stat)->cdr);
-      PUTS(" = ");
-      put_exp(c, CADDR(stat));
+      switch (TYPE(CADR(stat))) {
+      case HIR_LVAR:
+      case HIR_GVAR:
+        put_symbol(c, CADR(stat)->cdr);
+        PUTS(" = ");
+        put_exp(c, CADDR(stat));
+        break;
+      case HIR_IVAR:
+        PUTS("mrb_iv_set(mrb, __self__, ");
+        put_ivar_name(c, CADR(stat)->cdr);
+        PUTS(", ");
+        put_exp(c, CADDR(stat));
+        PUTS(")");
+        break;
+      }
       PUTS(";\n");
       return;
     case HIR_IFELSE:

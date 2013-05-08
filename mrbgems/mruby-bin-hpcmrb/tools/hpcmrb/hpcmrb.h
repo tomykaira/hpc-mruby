@@ -44,8 +44,11 @@ enum hir_type {
   HIR_STRING,     /* (:HIR_STRING text length) */
   HIR_LVAR,       /* (:HIR_LVAR . symbol) */
   HIR_GVAR,       /* (:HIR_GVAR . symbol) */
+  HIR_IVAR,       /* (:HIR_IVAR . symbol) */
+  HIR_CVAR,       /* (:HIR_CVAR . symbol) */
   HIR_CALL,       /* (:HIR_CALL func args...) */
   HIR_COND_OP,    /* (:HIR_COND_OP cond t f) t and f are exp */
+  HIR_DEFCLASS,   /* (:HIR_DEFCLASS sym super) super is not supported */
 };
 
 enum hir_primitive_type {
@@ -90,6 +93,7 @@ typedef struct hpc_state {
   HIR *decls;
   HIR *cells;
   HIR *gvars;                   /* found global variables */
+  HIR *classes;                 /* found class definitions */
   short line;
   jmp_buf jmp;
 } hpc_state;
