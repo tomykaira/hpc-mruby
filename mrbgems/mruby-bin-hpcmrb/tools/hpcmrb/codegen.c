@@ -177,7 +177,7 @@ put_variable(hpc_codegen_context *c, HIR *hir)
 }
 
 static int
-put_name_for_sym(hpc_codegen_context *c, mrb_sym sym)
+put_operator_name(hpc_codegen_context *c, mrb_sym sym)
 {
   size_t len;
   int i;
@@ -207,10 +207,29 @@ put_name_for_sym(hpc_codegen_context *c, mrb_sym sym)
   return 0;
 }
 
+static int
+put_invalid_name(hpc_codegen_context *c, mrb_sym sym)
+{
+  size_t len;
+  const char *name = mrb_sym2name_len(c->mrb, (mrb_sym)(intptr_t)sym, &len);
+
+  if (name[len-1] == '=') {
+    char new_name[32];
+    strncpy(new_name, name, len-1);
+    new_name[len-1] = '\0';
+    PUTS("set_");
+    PUTS(new_name);
+    return 1;
+  }
+
+  return 0;
+}
+
 static void
 put_function_name(hpc_codegen_context *c, HIR *sym)
 {
-  if (! put_name_for_sym(c, (mrb_sym)(intptr_t)sym)) {
+  if (! put_operator_name(c, (mrb_sym)(intptr_t)sym) &&
+      ! put_invalid_name(c, (mrb_sym)(intptr_t)sym)) {
     put_symbol(c, sym);
   }
 }
@@ -239,7 +258,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
         hpc_assert((intptr_t)funtype->car == HTYPE_FUNC);
         put_type(c, CADR(funtype));
         PUTS("\n");
-        put_symbol(c, CADDR(decl));
+        put_function_name(c, CADDR(decl));
         PUTS("(");
         while (params) {
           hpc_assert((intptr_t)params->car->car == HIR_PVARDECL);
