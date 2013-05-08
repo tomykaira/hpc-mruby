@@ -1,3 +1,4 @@
 5.times do |i|
-  puts i
+  v = i * 2
+  puts v
 end
