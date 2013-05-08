@@ -393,9 +393,9 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       return;
     case HIR_IFELSE:
       PUTS_INDENT;
-      PUTS("if (");
+      PUTS("if ( mrb_bool(");
       put_exp(c, CADR(stat));
-      PUTS(")\n");
+      PUTS(") )\n");
       if (CADDR(stat)) {
         put_statement(c, CADDR(stat), FALSE);
       } else {
