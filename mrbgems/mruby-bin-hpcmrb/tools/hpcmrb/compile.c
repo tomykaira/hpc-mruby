@@ -1455,6 +1455,8 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
     mandatory_params = mandatory_params->cdr;
   }
 
+  scope_finish(scope);
+
   /* TODO: inspect return type? */
   return new_fundecl(p, name,
       new_func_type(p, value_type, params), params, body);
@@ -1468,7 +1470,6 @@ compile(hpc_state *p, node *ast)
   hpc_scope *scope = scope_new(p, 0, 0, FALSE);
   parser_dump(p->mrb, ast, 0);
   HIR *main_body = typing(scope, ast);
-  mrb_pool_close(scope->mpool);
 
   HIR *params = list2(
       new_pvardecl(p, value_type, sym(scope->current_self->cdr)),
@@ -1482,8 +1483,9 @@ compile(hpc_state *p, node *ast)
   while (scope->defs) {
     /* FIXME: this management of defs possibly has bug */
     node *tree = (node *)scope->defs->car;
+    HIR *hir_tree;
     scope->defs = scope->defs->cdr;
-    HIR *hir_tree = compile_def(p, scope, tree);
+    hir_tree = compile_def(p, scope, tree);
     topdecls = cons(hir_tree, topdecls);
   }
 
@@ -1494,6 +1496,7 @@ compile(hpc_state *p, node *ast)
     p->gvars = p->gvars->cdr;
   }
 
+  mrb_pool_close(scope->mpool);
   return topdecls;
 }
 
