@@ -1432,9 +1432,10 @@ typing(hpc_scope *s, node *tree)
     case NODE_SELF:
       return s->current_self;
     case NODE_RETURN:
-      {
-        node *c = tree;
-        return new_return_value(p, typing(s, c));
+      if (tree) {
+        return new_return_value(p, typing(s, tree));
+      } else {
+        return new_return_void(p);
       }
     case NODE_ASGN:
       return typing_assign(s, tree);
@@ -1498,6 +1499,8 @@ typing(hpc_scope *s, node *tree)
 static HIR*
 insert_return_at_last(hpc_state *p, HIR *hir)
 {
+  if (!hir)
+    return hir;
   switch ((intptr_t)hir->car) {
   case HIR_INIT_LIST:
   case HIR_GVARDECL:
