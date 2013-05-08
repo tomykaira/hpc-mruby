@@ -298,18 +298,18 @@ class Scene
         r = rad.x / (nsf * nsf)
         g = rad.y / (nsf * nsf)
         b = rad.z / (nsf * nsf)
-        printf("%c", clamp(r))
-        printf("%c", clamp(g))
-        printf("%c", clamp(b))
+        print clamp(r).chr
+        print clamp(g).chr
+        print clamp(b).chr
       end
     end
   end
 end
 
 # File.open("ao.ppm", "w") do |fp|
-  printf("P6\n")
-  printf("%d %d\n", IMAGE_WIDTH, IMAGE_HEIGHT)
-  printf("255\n", IMAGE_WIDTH, IMAGE_HEIGHT)
+  print "P6\n"
+  print IMAGE_WIDTH.to_s + " " + IMAGE_HEIGHT.to_s + "\n"
+  print "255\n"
   Scene.new.render(IMAGE_WIDTH, IMAGE_HEIGHT, NSUBSAMPLES)
 #  Scene.new.render(256, 256, 2)
 # end
