@@ -1379,11 +1379,18 @@ compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
 {
   mrb_sym name = sym(ast->car);
   node *mandatory_params = ast->cdr->cdr->car->car;
+  node *lv_tree = ast->cdr->car;
   node *n_body = ast->cdr->cdr->cdr->car;
-  HIR *params = 0, *body, *last, *param;
-  /* FIXME: what will be lv? */
-  hpc_scope *scope = scope_new(p, prev_scope, 0, TRUE);
+  HIR *params = 0, *body, *last, *param, *lv = 0;
+  hpc_scope *scope;
 
+  while (lv_tree) {
+    if (lv_tree->car)
+      lv = cons(new_lvar(p, sym(lv_tree->car), lat_unknown), lv);
+    lv_tree = lv_tree->cdr;
+  }
+
+  scope = scope_new(p, prev_scope, lv, TRUE);
   body = typing(scope, n_body);
   body = insert_return_at_last(p, body);
 
