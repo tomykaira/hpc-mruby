@@ -55,7 +55,7 @@ MRuby::Build.new do |conf|
 
 
   # Generate binaries
-  # conf.bins = %w(mrbc)
+  conf.bins = %w(mrbc)
 
   # Generate mirb command
   conf.gem "#{root}/mrbgems/mruby-bin-mirb"
@@ -63,6 +63,8 @@ MRuby::Build.new do |conf|
   # Generate mruby command
   conf.gem "#{root}/mrbgems/mruby-bin-mruby"
 
+  # Generate hpcmrb command
+  conf.gem "#{root}/mrbgems/mruby-bin-hpcmrb"
 
   # C compiler settings
   # conf.cc do |cc|
