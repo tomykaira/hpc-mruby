@@ -1090,7 +1090,7 @@ static HIR*
 insert_return_at_last(hpc_state *p, HIR *hir)
 {
   if (!hir)
-    return hir;
+    return new_return_void(p);
   switch ((intptr_t)hir->car) {
   case HIR_INIT_LIST:
   case HIR_GVARDECL:
