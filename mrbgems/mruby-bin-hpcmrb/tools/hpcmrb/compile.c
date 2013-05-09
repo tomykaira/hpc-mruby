@@ -1470,7 +1470,7 @@ update_function_map(hpc_state *p, HIR *fundecl)
   HIR *map = p->function_map;
   HIR *class_name  = fundecl->cdr->cdr->car->car;
   HIR *method_name = fundecl->cdr->cdr->car->cdr;
-  int arg_count = length(fundecl->cdr->cdr->cdr->car);
+  int arg_count = length(fundecl->cdr->cdr->cdr->car)-1;
 
   while (map) {
     if (map->car->car == method_name) {

@@ -30,8 +30,10 @@ typedef struct {
   int indent;
 } hpc_codegen_context;
 
+static void put_decl(hpc_codegen_context *c, HIR *decl);
 static void put_exp(hpc_codegen_context *c, HIR *exp);
 static void put_statement(hpc_codegen_context *c, HIR *stat, int no_brace);
+int length(HIR *list);
 
 static void
 put_header(hpc_codegen_context *c)
@@ -81,6 +83,14 @@ puts_noescape(hpc_codegen_context *c, const char *str)
       break;
     }
   }
+}
+
+static void
+put_int(hpc_codegen_context *c, int i)
+{
+  char len[32];
+  sprintf(len, "%d", i);
+  PUTS(len);
 }
 
 static void
@@ -237,11 +247,8 @@ put_function_name(hpc_codegen_context *c, HIR *sym)
 }
 
 static void
-put_unique_function_name(hpc_codegen_context *c, HIR *name)
+put_unique_function_name(hpc_codegen_context *c, HIR* class_name, HIR* method_name)
 {
-  mrb_sym class_name = sym(name->car);
-  mrb_sym method_name = sym(name->cdr);
-
   if (class_name) {
     /* check uniqueness */
     put_symbol(c, class_name);
@@ -253,6 +260,12 @@ put_unique_function_name(hpc_codegen_context *c, HIR *name)
 }
 
 static void
+put_call_function_name(hpc_codegen_context *c, HIR* method_name, int arg_count)
+{
+  put_function_name(c, method_name); PUTS("_"); put_int(c, arg_count);
+}
+
+static void
 put_ivar_name(hpc_codegen_context *c, HIR *hir)
 {
   mrb_sym sym = (intptr_t)hir;
@@ -261,6 +274,27 @@ put_ivar_name(hpc_codegen_context *c, HIR *hir)
   PUTS("mrb_intern(mrb, \"");
   PUTS(name + 1);                /* skip @ */
   PUTS("\")");
+}
+
+static void
+put_fundecl_decl(hpc_codegen_context *c, HIR *decl)
+{
+  HIR *funtype = CADR(decl);
+  HIR *params = CADDDR(decl);
+  hpc_assert((intptr_t)funtype->car == HTYPE_FUNC);
+  put_type(c, CADR(funtype));
+  PUTS("\n");
+  put_unique_function_name(c, CADDR(decl)->car, CADDR(decl)->cdr);
+  PUTS("(");
+  while (params) {
+    hpc_assert((intptr_t)params->car->car == HIR_PVARDECL);
+    put_decl(c, params->car);
+    params = params->cdr;
+    if (params) {
+      PUTS(", ");
+    }
+  }
+  PUTS(")");
 }
 
 static void
@@ -282,23 +316,8 @@ put_decl(hpc_codegen_context *c, HIR *decl)
       return;
     case HIR_FUNDECL:
       {
-        HIR *funtype = CADR(decl);
-        HIR *params = CADDDR(decl);
-        hpc_assert((intptr_t)funtype->car == HTYPE_FUNC);
-        put_type(c, CADR(funtype));
-        PUTS("\n");
-        put_unique_function_name(c, CADDR(decl));
-        PUTS("(");
-        while (params) {
-          hpc_assert((intptr_t)params->car->car == HIR_PVARDECL);
-          put_decl(c, params->car);
-          params = params->cdr;
-          if (params) {
-            PUTS(", ");
-          }
-        }
-        PUTS(")\n");
-        PUTS("{\n");
+        put_fundecl_decl(c, decl);
+        PUTS("\n{\n");
         INDENT_PP;
         put_statement(c, CADDDDR(decl), TRUE);
         INDENT_MM;
@@ -342,15 +361,10 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       PUTS(")");
       return;
     case HIR_STRING:
-
       PUTS("mrb_str_new(mrb, \"");
       puts_noescape(c, (char *)CADR(exp));
       PUTS("\", ");
-      {
-        char len[32];
-        sprintf(len, "%d", (int)(intptr_t)CADDR(exp));
-        PUTS(len);
-      }
+      put_int(c, (intptr_t)CADDR(exp));
       PUTS(")");
       return;
     case HIR_LVAR:
@@ -367,10 +381,10 @@ put_exp(hpc_codegen_context *c, HIR *exp)
          - func is symbol
          - args are expressions
        */
-      put_function_name(c, CADR(exp));
-      PUTS("(");
       {
         HIR *args = exp->cdr->cdr;
+        put_call_function_name(c, CADR(exp), length(args)-1);
+        PUTS("(");
         while (args) {
           put_exp(c, args->car);
           args = args->cdr;
@@ -600,6 +614,126 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
   }
 }
 
+static int
+has_null_class(HIR *classes)
+{
+  while (classes) {
+    if (!classes->car) return TRUE;
+    classes = classes->cdr;
+  }
+  return FALSE;
+}
+
+/* mrb_value funname_1(mrb_value __self__, mrb_value arg1) */
+static void
+put_map_decl(hpc_codegen_context *c, HIR *elm)
+{
+  char buf[1024] = "", arglist[1024] = "";
+  HIR* method = elm->car;
+  const int arg_count = (intptr_t)method->cdr;
+  int i;
+
+  PUTS("mrb_value\n");
+  put_call_function_name(c, method->car, arg_count);
+  PUTS("(mrb_value __self__");
+  for (i = 0; i < arg_count; ++i) {
+    sprintf(buf, ", mrb_value arg%d", i);
+    PUTS(buf);
+    sprintf(arglist, "%s, arg%d", arglist, i);
+  }
+  PUTS(")");
+}
+
+/*
+  this does not handle initialize
+
+  mrb_value funname_1(mrb_value __self__, mrb_value arg1) {
+    struct *RClass c = mrb_obj_class(mrb, __self__);
+    if (c == mrb_class_get(mrb, "FirstClass")) {
+      FirstClass_funname(__self__, arg1);
+    } else if (c == mrb_class_get(mrb, "SecondClass")) {
+      SecondClass_funname(__self__, arg1);
+    } else {
+      mrb_funcall(mrb, __self__, "funname", 1, arg1);
+    }
+  }
+ */
+static void
+put_multiplexers(hpc_codegen_context *c, hpc_state *s)
+{
+  HIR * map = s->function_map;
+  mrb_state *mrb = c->mrb;
+  mrb_sym init_sym = mrb_intern(mrb, "initialize");
+
+  while (map) {
+    char buf[1024] = "", arglist[1024] = "";
+    HIR* elm = map->car;
+    HIR* method = elm->car;
+    HIR* classes = elm->cdr;
+    map = map->cdr;
+
+    if (sym(method->car) == init_sym)
+      continue;
+
+    const int arg_count = (intptr_t)method->cdr;
+    int i;
+
+    put_map_decl(c, elm);
+    PUTS("\n{\n");
+    for (i = 0; i < arg_count; ++i) {
+      sprintf(arglist, "%s, arg%d", arglist, i);
+    }
+
+    if (has_null_class(classes)) {
+      PUTS("\t");
+      put_unique_function_name(c, classes->car, method->car);
+      PUTS("(__self__");
+      PUTS(arglist);
+      PUTS(");\n}");
+
+      continue;
+    }
+
+    PUTS("\tstruct *RClass c = mrb_obj_class(mrb, __self__);\n");
+
+    while (classes) {
+      PUTS("\tif (c == mrb_class_get(mrb, \"");
+      put_symbol(c, classes->car);
+      PUTS("\")) {\n\t\treturn ");
+      put_unique_function_name(c, classes->car, method->car);
+      PUTS("(__self__");
+      PUTS(arglist);
+      PUTS(");\n\t} else ");
+
+      classes = classes->cdr;
+    }
+
+    PUTS("{\n");
+    sprintf(buf, "\t\tmrb_funcall(mrb, __self__, \"%s\", %d%s);\n",
+            mrb_sym2name(mrb, sym(method->car)), arg_count, arglist);
+    PUTS(buf);
+    PUTS("\t}\n}\n\n");
+  }
+}
+
+void
+put_fun_decls(hpc_codegen_context *c, HIR *hir, HIR *map)
+{
+  while (hir) {
+    if (TYPE(hir->car) == HIR_FUNDECL) {
+      put_fundecl_decl(c, hir->car);
+      PUTS(";\n");
+    }
+    hir = hir->cdr;
+  }
+
+  while (map) {
+    put_map_decl(c, map->car);
+    PUTS(";\n");
+    map = map->cdr;
+  }
+}
+
 mrb_value
 hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
 {
@@ -613,10 +747,12 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
 
   put_header(&c);
   /* toplevel is a list of decls */
+  put_fun_decls(&c, hir, s->function_map);
   while (hir) {
     put_decl(&c, hir->car);
     hir = hir->cdr;
   }
+  put_multiplexers(&c, s);
 
   return mrb_fixnum_value(0);
 }
