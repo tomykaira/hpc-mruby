@@ -649,7 +649,7 @@ put_map_decl(hpc_codegen_context *c, const mrb_sym name, const int arg_count)
   this does not handle initialize
 
   mrb_value funname_1(mrb_value __self__, mrb_value arg1) {
-    struct *RClass c = mrb_obj_class(mrb, __self__);
+    struct RClass *c = mrb_obj_class(mrb, __self__);
     if (c == mrb_class_get(mrb, "FirstClass")) {
       FirstClass_funname(__self__, arg1);
     } else if (c == mrb_class_get(mrb, "SecondClass")) {
@@ -695,7 +695,7 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
       continue;
     }
 
-    PUTS("\tstruct *RClass c = mrb_obj_class(mrb, __self__);\n");
+    PUTS("\tstruct RClass *c = mrb_obj_class(mrb, __self__);\n");
 
     while (classes) {
       PUTS("\tif (c == mrb_class_get(mrb, \"");
