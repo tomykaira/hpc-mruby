@@ -13,7 +13,7 @@ mrb_value hpc_str_plus(mrb_value, mrb_value);
 extern mrb_state *mrb; /* using mrb_state in the driver-main */
 
 mrb_value
-num_add(mrb_value a, mrb_value b)
+num_add_1(mrb_value a, mrb_value b)
 {
   switch (TYPES2(mrb_type(a), mrb_type(b))) {
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FIXNUM):
@@ -42,7 +42,7 @@ num_add(mrb_value a, mrb_value b)
 }
 
 mrb_value
-num_addi(mrb_value a, mrb_int b)
+num_addi_1(mrb_value a, mrb_int b)
 {
   switch (mrb_type(a)) {
   case MRB_TT_FIXNUM:
@@ -65,7 +65,7 @@ num_addi(mrb_value a, mrb_int b)
 }
 
 mrb_value
-num_sub(mrb_value a, mrb_value b)
+num_sub_1(mrb_value a, mrb_value b)
 {
   switch (TYPES2(mrb_type(a), mrb_type(b))) {
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FIXNUM):
@@ -92,7 +92,7 @@ num_sub(mrb_value a, mrb_value b)
 }
 
 mrb_value
-num_subi(mrb_value a, mrb_int b)
+num_subi_1(mrb_value a, mrb_int b)
 {
   switch (mrb_type(a)) {
   case MRB_TT_FIXNUM:
@@ -115,7 +115,7 @@ num_subi(mrb_value a, mrb_int b)
 }
 
 mrb_value
-num_mul(mrb_value a, mrb_value b)
+num_mul_1(mrb_value a, mrb_value b)
 {
   switch (TYPES2(mrb_type(a), mrb_type(b))) {
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FIXNUM):
@@ -142,7 +142,7 @@ num_mul(mrb_value a, mrb_value b)
 }
 
 mrb_value
-num_div(mrb_value a, mrb_value b)
+num_div_1(mrb_value a, mrb_value b)
 {
   switch (TYPES2(mrb_type(a), mrb_type(b))) {
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FIXNUM):
@@ -189,7 +189,7 @@ num_div(mrb_value a, mrb_value b)
 } while (0)
 
 mrb_value
-num_eq(mrb_value a, mrb_value b)
+num_eq_1(mrb_value a, mrb_value b)
 {
   if(mrb_obj_eq(NULL, a, b)) {
     return mrb_true_value();
@@ -200,25 +200,25 @@ num_eq(mrb_value a, mrb_value b)
 }
 
 mrb_value
-num_lt(mrb_value a, mrb_value b)
+num_lt_1(mrb_value a, mrb_value b)
 {
   OP_CMP(<);
 }
 
 mrb_value
-num_le(mrb_value a, mrb_value b)
+num_le_1(mrb_value a, mrb_value b)
 {
   OP_CMP(<=);
 }
 
 mrb_value
-num_gt(mrb_value a, mrb_value b)
+num_gt_1(mrb_value a, mrb_value b)
 {
   OP_CMP(>);
 }
 
 mrb_value
-num_ge(mrb_value a, mrb_value b)
+num_ge_1(mrb_value a, mrb_value b)
 {
   OP_CMP(>=);
 }
@@ -315,7 +315,7 @@ print_1(mrb_value __self__, mrb_value n)
 }
 
 mrb_value
-hpc_ary_aget(mrb_value __self__, mrb_value index)
+hpc_ary_aget_1(mrb_value __self__, mrb_value index)
 {
   if(mrb_type(index) != MRB_TT_FIXNUM){
     return mrb_ary_ref(mrb, __self__, mrb_fixnum(index));
@@ -325,7 +325,7 @@ hpc_ary_aget(mrb_value __self__, mrb_value index)
 }
 
 mrb_value
-hpc_ary_aset(mrb_value __self__, mrb_value index, mrb_value value)
+hpc_ary_aset_1(mrb_value __self__, mrb_value index, mrb_value value)
 {
 
   if(mrb_type(index) != MRB_TT_FIXNUM){
