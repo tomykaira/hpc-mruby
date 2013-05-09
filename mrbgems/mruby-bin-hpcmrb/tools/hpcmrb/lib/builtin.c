@@ -271,7 +271,7 @@ hpc_fixnum_to_str(mrb_value x, int base)
 
 /* value n's type is expected to be <string> or <fixnum> */
 mrb_value
-hpc_puts(mrb_value __self__, mrb_value n)
+puts_1(mrb_value __self__, mrb_value n)
 {
   mrb_value str;
 
@@ -293,7 +293,7 @@ hpc_puts(mrb_value __self__, mrb_value n)
 }
 
 mrb_value
-hpc_print(mrb_value __self__, mrb_value n)
+print_1(mrb_value __self__, mrb_value n)
 {
   mrb_value str;
 
@@ -313,7 +313,6 @@ hpc_print(mrb_value __self__, mrb_value n)
   printf("%s", cstr);
   return mrb_nil_value();
 }
-
 
 mrb_value
 hpc_ary_aget(mrb_value __self__, mrb_value index)

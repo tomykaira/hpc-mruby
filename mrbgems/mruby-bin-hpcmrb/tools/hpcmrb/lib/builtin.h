@@ -22,6 +22,8 @@ mrb_value num_gt(mrb_value, mrb_value);
 
 mrb_value num_ge(mrb_value, mrb_value);
 
+mrb_value puts_1(mrb_value __self__, mrb_value n);
+mrb_value print_1(mrb_value __self__, mrb_value n);
 
-void hpcmrb_puts(mrb_value, mrb_value);
-
+mrb_value hpc_ary_aget(mrb_value __self__, mrb_value index);
+mrb_value hpc_ary_aset(mrb_value __self__, mrb_value index, mrb_value value);

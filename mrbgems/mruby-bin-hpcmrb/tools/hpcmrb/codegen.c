@@ -211,8 +211,8 @@ put_operator_name(hpc_codegen_context *c, mrb_sym sym)
     {">=", "num_ge"},
     {"==", "num_eq"},
     {"!", "mrb_bob_not"},
-    {"[]", "mrb_ary_aget"},
-    {"[]=", "mrb_ary_aset"},
+    {"[]", "hpc_ary_aget"},
+    {"[]=", "hpc_ary_aset"},
     {"", ""}
   };
 
