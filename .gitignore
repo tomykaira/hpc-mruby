@@ -17,3 +17,6 @@ cscope.out
 /bin
 /build
 /lib
+/benchmark/*.c
+/mrbgems/mruby-bin-hpcmrb/testcases/*.c
+/mrbgems/mruby-bin-hpcmrb/tools/hpcmrb/lib/
