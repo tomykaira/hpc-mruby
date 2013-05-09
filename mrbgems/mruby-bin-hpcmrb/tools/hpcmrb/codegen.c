@@ -209,6 +209,7 @@ put_operator_name(hpc_codegen_context *c, mrb_sym sym)
     {"!", "mrb_bob_not"},
     {"[]", "hpc_ary_aget"},
     {"[]=", "hpc_ary_aset"},
+    {"-@", "num_uminus"},
     {"", ""}
   };
 
