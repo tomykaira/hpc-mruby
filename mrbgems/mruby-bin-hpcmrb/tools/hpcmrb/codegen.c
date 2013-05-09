@@ -603,7 +603,7 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
         put_exp(c, CADR(stat));
         PUTS(";\n");
       } else {
-        PUTS("return;\n");
+        PUTS("return mrb_nil_value();\n");
       }
       return;
     case HIR_EMPTY:
