@@ -729,9 +729,14 @@ put_fun_decls(hpc_codegen_context *c, HIR *hir, HIR *map)
     hir = hir->cdr;
   }
 
+  mrb_sym init_sym = mrb_intern(c->mrb, "initialize");
   while (map) {
+    if (init_sym == sym(map->car->car))
+      goto next;
     put_map_decl(c, map->car);
     PUTS(";\n");
+
+  next:
     map = map->cdr;
   }
 }
