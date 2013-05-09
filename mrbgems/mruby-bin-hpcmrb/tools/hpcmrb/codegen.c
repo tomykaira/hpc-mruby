@@ -410,9 +410,9 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       return;
     case HIR_DEFCLASS:
       /* mrb_define_class(mrb, NAME, mrb->object_class) */
-      PUTS("mrb_define_class(mrb, ");
+      PUTS("mrb_obj_value(mrb_define_class(mrb, \"");
       put_symbol(c, CADR(exp));
-      PUTS(", mrb->object_class)");
+      PUTS("\", mrb->object_class))");
       return;
     case HIR_INIT_LIST:
       PUTS("{");
