@@ -237,6 +237,22 @@ put_function_name(hpc_codegen_context *c, HIR *sym)
 }
 
 static void
+put_unique_function_name(hpc_codegen_context *c, HIR *name)
+{
+  mrb_sym class_name = sym(name->car);
+  mrb_sym method_name = sym(name->cdr);
+
+  if (class_name) {
+    /* check uniqueness */
+    put_symbol(c, class_name);
+    PUTS("_");
+    put_function_name(c, method_name);
+  } else {
+    put_function_name(c, method_name);
+  }
+}
+
+static void
 put_ivar_name(hpc_codegen_context *c, HIR *hir)
 {
   mrb_sym sym = (intptr_t)hir;
@@ -271,7 +287,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
         hpc_assert((intptr_t)funtype->car == HTYPE_FUNC);
         put_type(c, CADR(funtype));
         PUTS("\n");
-        put_function_name(c, CADDR(decl));
+        put_unique_function_name(c, CADDR(decl));
         PUTS("(");
         while (params) {
           hpc_assert((intptr_t)params->car->car == HIR_PVARDECL);

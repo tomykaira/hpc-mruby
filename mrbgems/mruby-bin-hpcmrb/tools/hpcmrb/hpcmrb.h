@@ -21,7 +21,7 @@ enum hir_type {
   HIR_GVARDECL,   /* (:HIR_GVARDECL type var value) */
   HIR_LVARDECL,   /* (:HIR_LVARDECL type var value) */
   HIR_PVARDECL,   /* (:HIR_PVARDECL type var) */
-  HIR_FUNDECL,    /* (:HIR_FUNDECL type sym (params...) body (options...)) */
+  HIR_FUNDECL,    /* (:HIR_FUNDECL type (class_sym . sym) (params...) body (classname)) */
 
   HIR_INIT_LIST,  /* (:HIR_INIT_LIST values...) */
 
@@ -90,10 +90,10 @@ typedef struct HIR {
 typedef struct hpc_state {
   mrb_state *mrb;
   struct mrb_pool *pool;
-  HIR *decls;
   HIR *cells;
   HIR *gvars;                   /* found global variables */
   HIR *classes;                 /* found class definitions */
+  HIR *function_map;            /* list ((fun name . arg count) . list (class name)) */
   short line;
   jmp_buf jmp;
 } hpc_state;

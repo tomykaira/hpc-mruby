@@ -449,6 +449,17 @@ cons_gen(hpc_state *p, HIR *car, HIR *cdr)
 
 void dump_varlist(mrb_state *mrb, HIR *list);
 
+int
+length(HIR *list)
+{
+  int c = 0;
+  while (list) {
+    c++;
+    list = list->cdr;
+  }
+  return c;
+}
+
 static HIR*
 append(hpc_state *p, HIR *list1, HIR *list2)
 {
@@ -547,9 +558,9 @@ new_pvardecl(hpc_state *p, HIR *type, mrb_sym sym)
 }
 
 static HIR*
-new_fundecl(hpc_state *p, mrb_sym sym, HIR *type, HIR *params, HIR *body)
+new_fundecl(hpc_state *p, mrb_sym class_name, mrb_sym sym, HIR *type, HIR *params, HIR *body)
 {
-  return list5((HIR*)HIR_FUNDECL, type, hirsym(sym), params, body);
+  return list5((HIR*)HIR_FUNDECL, type, cons(hirsym(class_name), hirsym(sym)), params, body);
 }
 
 static HIR*
@@ -745,6 +756,7 @@ typedef struct scope {
   int inherit_defs;
   HIR *lv;
   HIR *iv;
+  mrb_sym class_name;
   int sp;
 
   int lastlabel;
@@ -886,6 +898,7 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs, int inherit_
   if (inherit_defs) {
     s->defs = prev->defs;
     s->iv   = prev->iv;
+    s->class_name = prev->class_name;
   }
   if (inherit_lv) {
     /* append prev->lv after lv, not to destroy prev->lv */
@@ -1004,13 +1017,6 @@ search_abst_interp(mrb_state *mrb, struct RClass *klass, mrb_sym mid)
   }
 }
 
-static void
-add_def(hpc_scope *s, node *tree)
-{
-  hpc_state *p = s->hpc;
-  s->defs = cons((HIR*)tree, s->defs);
-}
-
 static HIR *typing(hpc_scope *s, node *tree);
 
 static HIR*
@@ -1078,6 +1084,58 @@ register_class_definition(hpc_state *p, mrb_sym name, node *tree)
 {
   /* TODO: override (define the same class twice) */
   p->classes = cons(cons(hirsym(name), (HIR *)tree), p->classes);
+}
+
+static HIR*
+insert_return_at_last(hpc_state *p, HIR *hir)
+{
+  if (!hir)
+    return hir;
+  switch ((intptr_t)hir->car) {
+  case HIR_INIT_LIST:
+  case HIR_GVARDECL:
+  case HIR_LVARDECL:
+  case HIR_PVARDECL:
+  case HIR_FUNDECL:
+    NOT_REACHABLE();
+    return hir;
+  case HIR_SCOPE:
+    hir->cdr->cdr = insert_return_at_last(p, hir->cdr->cdr);
+    return hir;
+  case HIR_BLOCK:
+    {
+      HIR *last = hir->cdr->car;
+      while (last->cdr)
+        last = last->cdr;
+      last->car = insert_return_at_last(p, last->car);
+    }
+    return hir;
+  case HIR_ASSIGN:
+    return new_block(p, list2(hir, new_return_value(p, hir->cdr->car)));
+  case HIR_IFELSE:
+    hir->cdr->cdr->car = insert_return_at_last(p, hir->cdr->cdr->car);
+    hir->cdr->cdr->cdr->car = insert_return_at_last(p, hir->cdr->cdr->cdr->car);
+    return hir;
+  case HIR_DOALL:
+  case HIR_WHILE:
+    return new_block(p, list2(hir, new_return_void(p)));
+  case HIR_BREAK:
+  case HIR_CONTINUE:
+    NOT_REACHABLE();
+  case HIR_RETURN:
+    return hir;
+  case HIR_EMPTY:
+    return new_return_void(p);
+  case HIR_INT:
+  case HIR_FLOAT:
+  case HIR_LVAR:
+  case HIR_GVAR:
+  case HIR_IVAR:
+  case HIR_CALL:
+    return new_return_value(p, hir);
+  default:
+    NOT_IMPLEMENTED();
+  }
 }
 
 static HIR*
@@ -1364,6 +1422,78 @@ typing_assign(hpc_scope *s, node *tree)
   }
 }
 
+static HIR*
+typing_def(hpc_scope *s, node *ast)
+{
+  hpc_state *p = s->hpc;
+  mrb_sym name = sym(ast->car);
+  node *mandatory_params = ast->cdr->cdr->car->car;
+  node *lv_tree = ast->cdr->car;
+  node *n_body = ast->cdr->cdr->cdr->car;
+  HIR *params = 0, *body, *last, *param;
+  hpc_scope *scope;
+  mrb_sym self_sym;
+
+  HIR *result = typing_block(s, lv_tree, mandatory_params, n_body, FALSE);
+
+  scope = (hpc_scope *)result->car;
+  self_sym = sym(scope->current_self->cdr);
+  scope_finish(scope);
+
+  body = result->cdr;
+
+  body = insert_return_at_last(p, body);
+
+  /*
+    args
+    TODO: - support other than mrb_value (using info in scope)
+          - optional and block args
+  */
+  /* TODO: define self type from scope->current_self->lat */
+  params = last = cons(new_pvardecl(p, value_type, self_sym), 0);
+
+  while (mandatory_params) {
+    param = new_pvardecl(p, value_type, sym(mandatory_params->car->cdr));
+    last->cdr = cons(param, 0);
+    last = last->cdr;
+    mandatory_params = mandatory_params->cdr;
+  }
+
+  /* TODO: inspect return type? */
+  return new_fundecl(p, s->class_name, name,
+      new_func_type(p, value_type, params), params, body);
+}
+
+static void
+update_function_map(hpc_state *p, HIR *fundecl)
+{
+  HIR *map = p->function_map;
+  HIR *class_name  = fundecl->cdr->cdr->car->car;
+  HIR *method_name = fundecl->cdr->cdr->car->cdr;
+  int arg_count = length(fundecl->cdr->cdr->cdr->car);
+
+  while (map) {
+    if (map->car->car == method_name) {
+      map->car->cdr = cons(class_name, map->car->cdr);
+      return;
+    }
+    map = map->cdr;
+  }
+  /* not found */
+  p->function_map = cons(cons(cons(method_name, (HIR*)arg_count),
+                              list1(class_name)),
+                         p->function_map);
+}
+
+static void
+add_def(hpc_scope *s, node *tree)
+{
+  hpc_state *p = s->hpc;
+  HIR *fundecl = typing_def(s, tree);
+  s->defs = cons(fundecl, s->defs);
+  update_function_map(p, fundecl);
+}
+
 static void
 collect_class_defs(hpc_scope *s, mrb_sym name, node *body)
 {
@@ -1371,15 +1501,12 @@ collect_class_defs(hpc_scope *s, mrb_sym name, node *body)
   hpc_scope *class_scope = scope_new(p, s, 0, FALSE, FALSE);
   HIR *defs;
 
+  class_scope->class_name = name;
   typing(class_scope, body); /* collect defs */
 
   defs = class_scope->defs;
   while (defs) {
-    node *n_def = (node *)defs->car;
-    char new_name[1024];
-    sprintf(new_name, "%s_%s", mrb_sym2name(p->mrb, name), mrb_sym2name(p->mrb, sym(n_def->car)));
-    n_def->car = (node *)(intptr_t)mrb_intern(p->mrb, new_name);
-    add_def(s, n_def);
+    s->defs = cons(defs->car, s->defs);
     defs = defs->cdr;
   }
 
@@ -1519,99 +1646,6 @@ typing(hpc_scope *s, node *tree)
   }
 }
 
-static HIR*
-insert_return_at_last(hpc_state *p, HIR *hir)
-{
-  if (!hir)
-    return hir;
-  switch ((intptr_t)hir->car) {
-  case HIR_INIT_LIST:
-  case HIR_GVARDECL:
-  case HIR_LVARDECL:
-  case HIR_PVARDECL:
-  case HIR_FUNDECL:
-    NOT_REACHABLE();
-    return hir;
-  case HIR_SCOPE:
-    hir->cdr->cdr = insert_return_at_last(p, hir->cdr->cdr);
-    return hir;
-  case HIR_BLOCK:
-    {
-      HIR *last = hir->cdr->car;
-      while (last->cdr)
-        last = last->cdr;
-      last->car = insert_return_at_last(p, last->car);
-    }
-    return hir;
-  case HIR_ASSIGN:
-    return new_block(p, list2(hir, new_return_value(p, hir->cdr->car)));
-  case HIR_IFELSE:
-    hir->cdr->cdr->car = insert_return_at_last(p, hir->cdr->cdr->car);
-    hir->cdr->cdr->cdr->car = insert_return_at_last(p, hir->cdr->cdr->cdr->car);
-    return hir;
-  case HIR_DOALL:
-  case HIR_WHILE:
-    return new_block(p, list2(hir, new_return_void(p)));
-  case HIR_BREAK:
-  case HIR_CONTINUE:
-    NOT_REACHABLE();
-  case HIR_RETURN:
-    return hir;
-  case HIR_EMPTY:
-    return new_return_void(p);
-  case HIR_INT:
-  case HIR_FLOAT:
-  case HIR_LVAR:
-  case HIR_GVAR:
-  case HIR_IVAR:
-  case HIR_CALL:
-    return new_return_value(p, hir);
-  default:
-    NOT_IMPLEMENTED();
-  }
-}
-
-static HIR*
-compile_def(hpc_state *p, hpc_scope *prev_scope, node *ast)
-{
-  mrb_sym name = sym(ast->car);
-  node *mandatory_params = ast->cdr->cdr->car->car;
-  node *lv_tree = ast->cdr->car;
-  node *n_body = ast->cdr->cdr->cdr->car;
-  HIR *params = 0, *body, *last, *param;
-  hpc_scope *scope;
-  mrb_sym self_sym;
-
-  HIR *result = typing_block(prev_scope, lv_tree, mandatory_params, n_body, FALSE);
-
-  scope = (hpc_scope *)result->car;
-  self_sym = sym(scope->current_self->cdr);
-  scope_finish(scope);
-
-  body = result->cdr;
-
-  body = insert_return_at_last(p, body);
-
-  /*
-    args
-    TODO: - support other than mrb_value (using info in scope)
-          - optional and block args
-  */
-  /* TODO: define self type from scope->current_self->lat */
-  params = last = cons(new_pvardecl(p, value_type, self_sym), 0);
-
-  while (mandatory_params) {
-    param = new_pvardecl(p, value_type, sym(mandatory_params->car->cdr));
-    last->cdr = cons(param, 0);
-    last = last->cdr;
-    mandatory_params = mandatory_params->cdr;
-  }
-
-  /* TODO: inspect return type? */
-  return new_fundecl(p, name,
-      new_func_type(p, value_type, params), params, body);
-}
-
 /* return a raw list of decls (fundecl, global decl) */
 static HIR*
 compile(hpc_state *p, node *ast)
@@ -1625,18 +1659,16 @@ compile(hpc_state *p, node *ast)
       new_pvardecl(p, value_type, sym(scope->current_self->cdr)),
       new_pvardecl(p, mrb_state_ptr_type, mrb_intern(p->mrb, "mrb"))
       );
-  HIR *main_fun = new_fundecl(p, mrb_intern(p->mrb, "compiled_main"),
+  HIR *main_fun = new_fundecl(p, 0, mrb_intern(p->mrb, "compiled_main"),
       new_func_type(p, void_type, params), params, main_body);
 
   topdecls = cons(main_fun, 0);
 
   while (scope->defs) {
     /* FIXME: this management of defs possibly has bug */
-    node *tree = (node *)scope->defs->car;
-    HIR *hir_tree;
+    HIR *tree = scope->defs->car;
     scope->defs = scope->defs->cdr;
-    hir_tree = compile_def(p, scope, tree);
-    topdecls = cons(hir_tree, topdecls);
+    topdecls = cons(tree, topdecls);
   }
 
   while (p->gvars) {
