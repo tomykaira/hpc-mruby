@@ -1,16 +1,20 @@
 #include "hpcmrb.h"
 #include <stdint.h>
 
-#define CADR(x) ((x)->cdr->car)
-#define CADDR(x) ((x)->cdr->cdr->car)
-#define CADDDR(x) ((x)->cdr->cdr->cdr->car)
-#define CADDDDR(x) ((x)->cdr->cdr->cdr->cdr->car)
+#define CDR(x) ((x)?(x)->cdr:0)
+#define CDDR(x) (CDR(x)?CDR(x)->cdr:0)
+#define CDDDR(x) (CDDR(x)?CDDR(x)->cdr:0)
+#define CDDDDR(x) (CDDDR(x)?CDDDR(x)->cdr:0)
+#define CADR(x) (CDR(x)?CDR(x)->car:0)
+#define CADDR(x) (CDDR(x)?CDDR(x)->car:0)
+#define CADDDR(x) (CDDDR(x)?CDDDR(x)->car:0)
+#define CADDDDR(x) (CDDDDR(x)?CDDDDR(x)->car:0)
 
-#define TYPE(x) ((intptr_t)((x)->car))
+#define TYPE(x) ((intptr_t)(x?(x)->car:0))
 #define DECLP(t) (t == HIR_GVARDECL || t == HIR_LVARDECL || \
                   t == HIR_PVARDECL)
 
-#define PUTS(str) (fputs((str), c->wfp))
+#define PUTS(str) (fputs((str)?(str):"NULL", c->wfp))
 #define PUTS_INDENT do {                        \
     int __i;                                    \
     for (__i = 0; __i < c->indent; ++__i) {     \
@@ -29,6 +33,43 @@ typedef struct {
 
 static void put_exp(hpc_hirprint_context *c, HIR *exp);
 static void put_statement(hpc_hirprint_context *c, HIR *stat);
+
+static void
+put_hir_type(hpc_hirprint_context *c, HIR *kind){
+  PUTS("unexpected hir_type ");
+  switch((intptr_t)kind){
+  case HIR_GVARDECL:  PUTS("HIR_GVARDECL");  break;
+  case HIR_LVARDECL:  PUTS("HIR_LVARDECL");  break;
+  case HIR_PVARDECL:  PUTS("HIR_PVARDECL");  break;
+  case HIR_FUNDECL:   PUTS("HIR_FUNDECL");   break;
+  case HIR_INIT_LIST: PUTS("HIR_INIT_LIST"); break;
+  case HIR_SCOPE:     PUTS("HIR_SCOPE");     break;
+  case HIR_BLOCK:     PUTS("HIR_BLOCK");     break;
+  case HIR_ASSIGN:    PUTS("HIR_ASSING");    break;
+  case HIR_IFELSE:    PUTS("HIR_IFELSE");    break;
+  case HIR_DOALL:     PUTS("HIR_DOALL");     break;
+  case HIR_WHILE:     PUTS("HIR_WHILE");     break;
+  case HIR_BREAK:     PUTS("HIR_BREAK");     break;
+  case HIR_CONTINUE:  PUTS("HIR_CONTINUE");  break;
+  case HIR_RETURN:    PUTS("HIR_RETURN");    break;
+  case HIR_EMPTY:     PUTS("HIR_EMPTY");     break;
+  case HIR_PRIM:      PUTS("HIR_PRIM");      break;
+  case HIR_INT:       PUTS("HIR_INT");       break;
+  case HIR_FLOAT:     PUTS("HIR_FLOAT");     break;
+  case HIR_STRING:    PUTS("HIR_STRING");    break;
+  case HIR_LVAR:      PUTS("HIR_LVAR");      break;
+  case HIR_GVAR:      PUTS("HIR_GVAR");      break;
+  case HIR_CALL:      PUTS("HIR_CALL");      break;
+  case HIR_COND_OP:   PUTS("HIR_COND_OP");   break;
+  default:
+    {
+      char buff[32];
+      sprintf(buff, "not hir_type value %p", kind);
+      PUTS(buff);
+    }    
+    break;
+  }
+}
 
 static void
 put_type(hpc_hirprint_context *c, HIR *kind)
@@ -62,14 +103,21 @@ put_type(hpc_hirprint_context *c, HIR *kind)
     PUTS("ptr");
     return;
   case HTYPE_ARRAY:
+    PUTS("not reachable HTYPE_ARRAY");
+    return;
   case HTYPE_FUNC:
-    NOT_REACHABLE();
+    PUTS("not reachable HTYPE_FUNC");
     return;
   case HTYPE_TYPEDEF:
     PUTS((char *)CADR(kind));
     return;
   default:
-    NOT_REACHABLE();
+    {
+      char buff[32];
+      sprintf(buff, "not hir_type_kind value %p", (void*)k);
+      PUTS(buff);
+    }
+    break;
   }
 }
 
@@ -200,7 +248,8 @@ put_decl(hpc_hirprint_context *c, HIR *decl)
     }
     return;
   default:
-    NOT_REACHABLE();
+    put_hir_type(c, (HIR*)TYPE(decl));
+    break;
   }
 }
 
@@ -334,12 +383,13 @@ put_exp(hpc_hirprint_context *c, HIR *exp)
     PUTS("(:HIR_INIT_LIST ");
     {
       HIR *values = exp->cdr;
+      INDENT_PP;
       while (values) {
+        PUTS("\n");        
         put_exp(c, values->car);
         values = values->cdr;
-        if (values)
-          PUTS(" ");
       }
+      INDENT_MM;
     }
     PUTS(")");
     return;
@@ -352,8 +402,6 @@ put_exp(hpc_hirprint_context *c, HIR *exp)
       while (exps) {
         PUTS("\n");
         put_exp(c, exps->car);
-        if (exps->cdr)
-          PUTS(" ");
         exps = exps->cdr;
       }
       INDENT_MM;
@@ -361,7 +409,8 @@ put_exp(hpc_hirprint_context *c, HIR *exp)
     }
     return;
   default:
-    NOT_REACHABLE();
+    put_hir_type(c, (HIR*)TYPE(exp));
+    break;
   }
 }
 
@@ -487,7 +536,8 @@ put_statement(hpc_hirprint_context *c, HIR *stat)
       PUTS(")");
       return;
     default:
-      NOT_REACHABLE();
+      put_hir_type(c, (HIR*)TYPE(stat));
+      break;
   }
 }
 
