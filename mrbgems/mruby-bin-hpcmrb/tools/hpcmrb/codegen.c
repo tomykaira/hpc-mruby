@@ -630,15 +630,13 @@ has_null_class(HIR *classes)
 
 /* mrb_value funname_1(mrb_value __self__, mrb_value arg1) */
 static void
-put_map_decl(hpc_codegen_context *c, HIR *elm)
+put_map_decl(hpc_codegen_context *c, const mrb_sym name, const int arg_count)
 {
   char buf[1024] = "";
-  HIR* method = elm->car;
-  const int arg_count = (intptr_t)method->cdr;
   int i;
 
   PUTS("mrb_value\n");
-  put_call_function_name(c, method->car, arg_count);
+  put_call_function_name(c, (HIR*)(intptr_t)name, arg_count);
   PUTS("(mrb_value __self__");
   for (i = 0; i < arg_count; ++i) {
     sprintf(buf, ", mrb_value arg%d", i);
@@ -681,7 +679,7 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
     const int arg_count = (intptr_t)method->cdr;
     int i;
 
-    put_map_decl(c, elm);
+    put_map_decl(c, sym(method->car), arg_count);
     PUTS("\n{\n");
     for (i = 0; i < arg_count; ++i) {
       sprintf(arglist, "%s, arg%d", arglist, i);
@@ -732,13 +730,27 @@ put_fun_decls(hpc_codegen_context *c, HIR *hir, HIR *map)
 
   mrb_sym init_sym = mrb_intern(c->mrb, "initialize");
   while (map) {
-    if (init_sym == sym(map->car->car))
+    HIR * method = map->car->car;
+    if (init_sym == sym(method->car))
       goto next;
-    put_map_decl(c, map->car);
+    put_map_decl(c, sym(method->car), (intptr_t)method->cdr);
     PUTS(";\n");
 
   next:
     map = map->cdr;
+  }
+}
+
+void
+put_new_decls(hpc_codegen_context *c, int max_arg)
+{
+  int arg_count;
+  mrb_sym new_sym = mrb_intern(c->mrb, "new");
+
+  for (arg_count = 0; arg_count < max_arg; ++arg_count) {
+    put_map_decl(c, new_sym, arg_count);
+    PUTS("\n{\n");
+    PUTS("}\n\n");
   }
 }
 
@@ -756,6 +768,7 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   put_header(&c);
   /* toplevel is a list of decls */
   put_fun_decls(&c, hir, s->function_map);
+  put_new_decls(&c, 4);
   while (hir) {
     put_decl(&c, hir->car);
     hir = hir->cdr;
