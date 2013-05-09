@@ -1,7 +1,6 @@
 #include "hpcmrb.h"
 #include "mruby.h"
 #include "mruby/value.h"
-#include <stdio.h> /* for hpcmrb_puts */
 
 #define TYPES2(a,b) ((((uint16_t)(a))<<8)|(((uint16_t)(b))&0xff))
 
@@ -212,18 +211,4 @@ mrb_value
 num_ge(mrb_value a, mrb_value b)
 {
   OP_CMP(>=);
-}
-
-
-
-/* using mrb_state in the driver-main */
-extern mrb_state *mrb;
-
-void
-hpcmrb_puts(mrb_value __self__, mrb_value n)
-{
-  mrb_value str = mrb_any_to_s(mrb, n);
-  const char *cstr = mrb_str_to_cstr(mrb, str);
-  /* calling c puts */
-  puts(cstr);
 }
