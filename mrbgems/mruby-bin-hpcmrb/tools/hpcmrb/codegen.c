@@ -219,8 +219,8 @@ put_invalid_name(hpc_codegen_context *c, mrb_sym sym)
     char new_name[32];
     strncpy(new_name, name, len-1);
     new_name[len-1] = '\0';
-    PUTS("set_");
     PUTS(new_name);
+    PUTS("_set");
     return 1;
   }
 
