@@ -43,6 +43,7 @@ put_header(hpc_codegen_context *c)
   PUTS("#include <stdlib.h>\n");
   PUTS("#include \"mruby.h\"\n\n");
   PUTS("#include \"builtin.h\"\n\n");
+  PUTS("extern mrb_state * mrb;");
 }
 
 static void
@@ -146,12 +147,7 @@ put_symbol(hpc_codegen_context *c, HIR *hir)
 {
   mrb_sym sym = (intptr_t)hir;
   const char * name = mrb_sym2name(c->mrb, sym);
-  if(strcmp(name, "puts") == 0){
-    PUTS("hpcmrb_puts");
-  }
-  else{
-    PUTS(name);
-  }
+  PUTS(name);
 }
 
 /* Take two heads from hir as type and var */
@@ -749,7 +745,6 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
 
   c.indent = 0;
   c.mrb = s->mrb;
-  /* c.wfp = stdout; */
   c.wfp = wfp;
 
   put_header(&c);
