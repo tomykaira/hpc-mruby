@@ -42,6 +42,7 @@ put_header(hpc_codegen_context *c)
   PUTS("#include <stdio.h>\n");
   PUTS("#include <stdlib.h>\n");
   PUTS("#include \"mruby.h\"\n\n");
+  PUTS("#include \"mruby/variable.h\"\n\n");
   PUTS("#include \"builtin.h\"\n\n");
   PUTS("extern mrb_state * mrb;");
 }
