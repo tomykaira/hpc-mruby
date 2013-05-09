@@ -631,7 +631,7 @@ has_null_class(HIR *classes)
 static void
 put_map_decl(hpc_codegen_context *c, HIR *elm)
 {
-  char buf[1024] = "", arglist[1024] = "";
+  char buf[1024] = "";
   HIR* method = elm->car;
   const int arg_count = (intptr_t)method->cdr;
   int i;
@@ -642,7 +642,6 @@ put_map_decl(hpc_codegen_context *c, HIR *elm)
   for (i = 0; i < arg_count; ++i) {
     sprintf(buf, ", mrb_value arg%d", i);
     PUTS(buf);
-    sprintf(arglist, "%s, arg%d", arglist, i);
   }
   PUTS(")");
 }
