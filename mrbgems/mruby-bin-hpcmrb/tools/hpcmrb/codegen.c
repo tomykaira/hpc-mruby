@@ -687,7 +687,7 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
     }
 
     if (has_null_class(classes)) {
-      PUTS("\t");
+      PUTS("\treturn ");
       put_unique_function_name(c, classes->car, method->car);
       PUTS("(__self__");
       PUTS(arglist);
@@ -711,7 +711,7 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
     }
 
     PUTS("{\n");
-    sprintf(buf, "\t\tmrb_funcall(mrb, __self__, \"%s\", %d%s);\n",
+    sprintf(buf, "\t\treturn mrb_funcall(mrb, __self__, \"%s\", %d%s);\n",
             mrb_sym2name(mrb, sym(method->car)), arg_count, arglist);
     PUTS(buf);
     PUTS("\t}\n}\n\n");
