@@ -9,10 +9,8 @@
 #define TYPES2(a,b) ((((uint16_t)(a))<<8)|(((uint16_t)(b))&0xff))
 
 mrb_value hpc_str_plus(mrb_value, mrb_value);
-extern struct RString* str_new(mrb_state *, const char *, int);/* defined in string.c, but not decleared in string.h (for hpc_str_plus)*/
 
 extern mrb_state *mrb; /* using mrb_state in the driver-main */
-
 
 mrb_value
 num_add(mrb_value a, mrb_value b)
@@ -232,16 +230,18 @@ hpc_str_plus(mrb_value a, mrb_value b)
 {
   struct RString *s = mrb_str_ptr(a);
   struct RString *s2 = mrb_str_ptr(b);
-  struct RString *t;
 
-  t = str_new(mrb, 0, s->len + s2->len);
+
+  mrb_value v = mrb_str_new(mrb, 0, s->len + s2->len);
+  struct RString *t = mrb_str_ptr(v);
+
   memcpy(t->ptr, s->ptr, s->len);
   memcpy(t->ptr + s->len, s2->ptr, s2->len);
 
-  return mrb_obj_value(t);
+  return v;
 }
 
-/* almost copied from numeric.c(hpcmrb_fixnum_to_str) */
+/* almost copied from numeric.c(mrb_fixnum_to_str) */
 mrb_value
 hpc_fixnum_to_str(mrb_value x, int base)
 {
@@ -270,7 +270,7 @@ hpc_fixnum_to_str(mrb_value x, int base)
 }
 
 /* value n's type is expected to be <string> or <fixnum> */
-void
+mrb_value
 hpc_puts(mrb_value __self__, mrb_value n)
 {
   mrb_value str;
@@ -289,9 +289,10 @@ hpc_puts(mrb_value __self__, mrb_value n)
   const char *cstr = mrb_str_to_cstr(mrb, str);
   /* calling c puts */
   printf("%s\n", cstr);
+  return mrb_nil_value();
 }
 
-void
+mrb_value
 hpc_print(mrb_value __self__, mrb_value n)
 {
   mrb_value str;
@@ -310,6 +311,7 @@ hpc_print(mrb_value __self__, mrb_value n)
   const char *cstr = mrb_str_to_cstr(mrb, str);
   /* calling c puts */
   printf("%s", cstr);
+  return mrb_nil_value();
 }
 
 
@@ -320,7 +322,7 @@ hpc_ary_aget(mrb_value __self__, mrb_value index)
     return mrb_ary_ref(mrb, __self__, mrb_fixnum(index));
   }
   puts("TYPE_ERROR: expected Fixnum for 1st argument (hpc_ary_aget)");
-  return mrb_nil_value(); /* dummy to avoid warning : not reach here */
+  return mrb_nil_value();
 }
 
 mrb_value
@@ -332,5 +334,5 @@ hpc_ary_aset(mrb_value __self__, mrb_value index, mrb_value value)
     return value;
   }
   puts("TYPE_ERROR: expected Fixnum for 1st argument (hpc_ary_aset)");
-  return mrb_nil_value(); /* dummy to avoid warning : not reach here */
+  return mrb_nil_value();
 }
