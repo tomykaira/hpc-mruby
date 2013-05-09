@@ -1473,7 +1473,8 @@ update_function_map(hpc_state *p, HIR *fundecl)
   int arg_count = length(fundecl->cdr->cdr->cdr->car)-1;
 
   while (map) {
-    if (map->car->car == method_name) {
+    if (map->car->car->car == method_name &&
+        (intptr_t)map->car->car->cdr == arg_count) {
       map->car->cdr = cons(class_name, map->car->cdr);
       return;
     }
