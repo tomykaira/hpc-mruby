@@ -43,6 +43,7 @@ put_header(hpc_codegen_context *c)
   PUTS("#include <stdlib.h>\n");
   PUTS("#include \"mruby.h\"\n\n");
   PUTS("#include \"mruby/variable.h\"\n\n");
+  PUTS("#include \"mruby/class.h\"\n\n");
   PUTS("#include \"builtin.h\"\n\n");
   PUTS("extern mrb_state * mrb;");
 }
@@ -664,7 +665,6 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
 {
   HIR * map = s->function_map;
   mrb_state *mrb = c->mrb;
-  mrb_sym init_sym = mrb_intern(mrb, "initialize");
 
   while (map) {
     char buf[1024] = "", arglist[1024] = "";
@@ -673,7 +673,7 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
     HIR* classes = elm->cdr;
     map = map->cdr;
 
-    if (sym(method->car) == init_sym)
+    if (sym(method->car) == mrb->init_sym)
       continue;
 
     const int arg_count = (intptr_t)method->cdr;
@@ -728,10 +728,9 @@ put_fun_decls(hpc_codegen_context *c, HIR *hir, HIR *map)
     hir = hir->cdr;
   }
 
-  mrb_sym init_sym = mrb_intern(c->mrb, "initialize");
   while (map) {
     HIR * method = map->car->car;
-    if (init_sym == sym(method->car))
+    if (c->mrb->init_sym == sym(method->car))
       goto next;
     put_map_decl(c, sym(method->car), (intptr_t)method->cdr);
     PUTS(";\n");
@@ -741,15 +740,68 @@ put_fun_decls(hpc_codegen_context *c, HIR *hir, HIR *map)
   }
 }
 
+HIR *
+lookup_map(HIR *map, mrb_sym sym, int arg_count)
+{
+  while (map) {
+    HIR *m = map->car->car;
+    if (sym(m->car) == sym && (intptr_t)m->cdr == arg_count)
+      return map->car->cdr;
+    map = map->cdr;
+  }
+
+  return NULL;
+}
+
+/* cf. mrb_instance_new in class.c */
 void
-put_new_decls(hpc_codegen_context *c, int max_arg)
+put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
 {
   int arg_count;
   mrb_sym new_sym = mrb_intern(c->mrb, "new");
+  char buf[1024];
 
   for (arg_count = 0; arg_count < max_arg; ++arg_count) {
+    char arglist[1024] = "";
+    int i;
+    HIR * classes = lookup_map(map, c->mrb->init_sym, arg_count);
+    for (i = 0; i < arg_count; ++i) {
+      sprintf(arglist, "%s, arg%d", arglist, i);
+    }
+
     put_map_decl(c, new_sym, arg_count);
     PUTS("\n{\n");
+
+    PUTS("\tstruct RClass *c = mrb_class_ptr(__self__);\n");
+    PUTS("\tstruct RObject *o;\n");
+    PUTS("\tenum mrb_vtype ttype = MRB_INSTANCE_TT(c);\n");
+    PUTS("\tmrb_value obj;\n");
+
+    PUTS("\tif (ttype == 0) ttype = MRB_TT_OBJECT;\n");
+    PUTS("\to = (struct RObject*)mrb_obj_alloc(mrb, ttype, c);\n");
+    PUTS("\tobj = mrb_obj_value(o);\n");
+
+    while (classes) {
+      PUTS("\tif (c == mrb_class_get(mrb, \"");
+      put_symbol(c, classes->car);
+      PUTS("\")) {\n\t\t");
+      put_unique_function_name(c, classes->car, (HIR *)(intptr_t)c->mrb->init_sym);
+      PUTS("(obj");
+      PUTS(arglist);
+      PUTS(");\n\t} else ");
+
+      classes = classes->cdr;
+    }
+
+    PUTS("{\n");
+    sprintf(buf, "\t\tmrb_funcall(mrb, obj, \"%s\", %d%s);\n",
+            "initialize", arg_count, arglist);
+    PUTS(buf);
+    PUTS("\t}\n");
+
+
+    PUTS("return obj;\n");
+
     PUTS("}\n\n");
   }
 }
@@ -768,7 +820,7 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   put_header(&c);
   /* toplevel is a list of decls */
   put_fun_decls(&c, hir, s->function_map);
-  put_new_decls(&c, 4);
+  put_new_decls(&c, s->function_map, 4);
   while (hir) {
     put_decl(&c, hir->car);
     hir = hir->cdr;
