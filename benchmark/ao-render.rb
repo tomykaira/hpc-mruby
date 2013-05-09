@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # AO render benchmark
 # Original program (C) Syoyo Fujita in Javascript (and other languages)
 #      http://lucille.atso-net.jp/blog/?p=642
@@ -255,11 +256,11 @@ class Scene
   def render(w, h, nsubsamples)
     cnt = 0
     nsf = nsubsamples.to_f
-    h.times do |y|
+    h.times do |y| # width * heightの点についてループを回す
       w.times do |x|
-        rad = Vec.new(0.0, 0.0, 0.0)
+        rad = Vec.new(0.0, 0.0, 0.0) # RGBを(0,0,0)に初期化
 
-        # Subsmpling
+        # Subsmpling # 2*2回だけ衝突判定を試す(最終的にはそれらの平均をとる)
         nsubsamples.times do |v|
           nsubsamples.times do |u|
             cnt = cnt + 1
