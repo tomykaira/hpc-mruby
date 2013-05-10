@@ -6,6 +6,7 @@
 #include <limits.h> /* CHAR_BIT macro */
 #include <string.h> /* memcpy */
 #include <math.h>
+#include <stdlib.h>
 
 #define TYPES2(a,b) ((((uint16_t)(a))<<8)|(((uint16_t)(b))&0xff))
 
@@ -410,4 +411,11 @@ mrb_value
 to_s_0(mrb_value __self__)
 {
   return mrb_funcall(mrb, __self__, "to_s", 0);
+}
+
+mrb_value
+rand_0(mrb_value __self__)
+{
+  mrb_float x = rand() / (mrb_float)RAND_MAX;
+  return mrb_float_value(x);
 }
