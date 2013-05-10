@@ -152,9 +152,22 @@ put_symbol(hpc_codegen_context *c, HIR *hir)
   PUTS(name);
 }
 
+static void
+put_var(hpc_codegen_context *c, HIR *hir)
+{
+  mrb_sym sym = (intptr_t)hir;
+  const char * name = mrb_sym2name(c->mrb, sym);
+  if (name[0] == '$') {
+    PUTS("G_"); PUTS(name + 1); /* replace $ in global variables */
+  } else {
+    PUTS(name);
+  }
+
+}
+
 /* Take two heads from hir as type and var */
 static void
-put_variable(hpc_codegen_context *c, HIR *hir)
+put_vardecl(hpc_codegen_context *c, HIR *hir)
 {
   HIR *type = hir->car;
   enum hir_type_kind k = (intptr_t)type->car;
@@ -187,7 +200,7 @@ put_variable(hpc_codegen_context *c, HIR *hir)
   default:
     put_type(c, type);
     PUTS(" ");
-    put_symbol(c, var);
+    put_var(c, var);
     return;
   }
 }
@@ -308,7 +321,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
   switch (TYPE(decl)) {
     case HIR_GVARDECL:
     case HIR_LVARDECL:
-      put_variable(c, decl->cdr);
+      put_vardecl(c, decl->cdr);
       if (TYPE(CADDDR(decl)) != HIR_EMPTY) {
         PUTS(" = ");
         put_exp(c, CADDDR(decl));
@@ -316,7 +329,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
       PUTS(";\n");
       return;
     case HIR_PVARDECL:
-      put_variable(c, decl->cdr);
+      put_vardecl(c, decl->cdr);
       return;
     case HIR_FUNDECL:
       {
@@ -373,7 +386,7 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       return;
     case HIR_LVAR:
     case HIR_GVAR:
-      put_symbol(c, exp->cdr);
+      put_var(c, exp->cdr);
       return;
     case HIR_IVAR:
       PUTS("mrb_iv_get(mrb, __self__, ");
@@ -505,7 +518,7 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       switch (TYPE(CADR(stat))) {
       case HIR_LVAR:
       case HIR_GVAR:
-        put_symbol(c, CADR(stat)->cdr);
+        put_var(c, CADR(stat)->cdr);
         PUTS(" = ");
         put_exp(c, CADDR(stat));
         break;
