@@ -757,12 +757,14 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
       continue;
     }
 
+    PUTS("\tint ai = mrb_gc_arena_save(mrb);\n");
+    PUTS("\tmrb_value result;\n");
     PUTS("\tstruct RClass *c = mrb_obj_class(mrb, __self__);\n");
 
     while (classes) {
       PUTS("\tif (c == mrb_class_get(mrb, \"");
       put_symbol(c, classes->car);
-      PUTS("\")) {\n\t\treturn ");
+      PUTS("\")) {\n\t\tresult = ");
       put_unique_function_name(c, classes->car, method->car);
       PUTS("(__self__");
       PUTS(arglist);
@@ -772,10 +774,13 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
     }
 
     PUTS("{\n");
-    sprintf(buf, "\t\treturn mrb_funcall(mrb, __self__, \"%s\", %d%s);\n",
+    sprintf(buf, "\t\tresult = mrb_funcall(mrb, __self__, \"%s\", %d%s);\n",
             mrb_sym2name(mrb, sym(method->car)), arg_count, arglist);
     PUTS(buf);
-    PUTS("\t}\n}\n\n");
+    PUTS("\t}\n");
+    PUTS("\tmrb_gc_arena_restore(mrb,  ai);\n");
+    PUTS("\treturn result;\n");
+    PUTS("}\n\n");
   }
 }
 
