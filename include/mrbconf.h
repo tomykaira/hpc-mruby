@@ -26,6 +26,8 @@
 /* argv max size in mrb_funcall */
 //#define MRB_FUNCALL_ARGC_MAX 16
 
+#define MRB_ARENA_SIZE (1024*1024)
+
 /* number of object per heap page */
 //#define MRB_HEAP_PAGE_SIZE 1024
 

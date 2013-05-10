@@ -282,6 +282,8 @@ puts_1(mrb_value __self__, mrb_value n)
   return mrb_nil_value();
 }
 
+
+extern FILE *debug_fp;
 mrb_value
 print_1(mrb_value __self__, mrb_value n)
 {
@@ -290,7 +292,12 @@ print_1(mrb_value __self__, mrb_value n)
   const char *cstr = RSTRING_PTR(n);
   size_t i, len = RSTRING_LEN(n);
   for (i = 0; i < len; ++i) {
-    putchar(cstr[i]);
+    if (debug_fp) {
+      putc(cstr[i], debug_fp);
+      fflush(debug_fp);
+    } else {
+      putchar(cstr[i]);
+    }
   }
   return mrb_nil_value();
 }

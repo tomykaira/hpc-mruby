@@ -13,14 +13,17 @@ extern void compiled_main(mrb_value, mrb_state *);
 
 mrb_state *mrb;
 
+FILE *debug_fp = NULL;
 int
 main(int argc, char **argv)
 {
   mrb = mrb_open();
   mrb->gc_disabled = TRUE;
+  debug_fp = fopen("result.ppm", "w");
 
   compiled_main(mrb_top_self(mrb), mrb);
 
+  fclose(debug_fp);
   mrb_close(mrb);
 
   return 0;
