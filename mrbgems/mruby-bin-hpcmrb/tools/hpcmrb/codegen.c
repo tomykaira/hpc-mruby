@@ -419,6 +419,8 @@ put_exp(hpc_codegen_context *c, HIR *exp, int val)
       }
     case HIR_INT:
       PUTS("mrb_fixnum_value(");
+      if (CADDR(exp) == 16)
+        PUTS("0x");
       PUTS((char *)CADR(exp));
       PUTS(")");
       return;
