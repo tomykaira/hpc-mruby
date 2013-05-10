@@ -37,3 +37,4 @@ mrb_value rand_0(mrb_value __self__);
 mrb_value cos_1(mrb_value __self__, mrb_value);
 mrb_value sin_1(mrb_value __self__, mrb_value);
 mrb_value to_s_0(mrb_value __self__);
+mrb_value bob_not_0(mrb_value __self__);

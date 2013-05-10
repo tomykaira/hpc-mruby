@@ -289,6 +289,12 @@ print_1(mrb_value __self__, mrb_value n)
 }
 
 mrb_value
+bob_not_0(mrb_value __self__)
+{
+  return mrb_bool_value(!mrb_test(__self__));
+}
+
+mrb_value
 hpc_ary_aget_1(mrb_value __self__, mrb_value index)
 {
   if(mrb_type(index) != MRB_TT_FIXNUM){
