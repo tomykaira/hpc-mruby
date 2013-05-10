@@ -305,7 +305,7 @@ hpc_ary_aget_1(mrb_value __self__, mrb_value index)
 }
 
 mrb_value
-hpc_ary_aset_1(mrb_value __self__, mrb_value index, mrb_value value)
+hpc_ary_aset_2(mrb_value __self__, mrb_value index, mrb_value value)
 {
 
   if(mrb_type(index) != MRB_TT_FIXNUM){
