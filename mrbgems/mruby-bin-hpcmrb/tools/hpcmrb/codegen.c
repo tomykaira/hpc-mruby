@@ -255,7 +255,6 @@ static void
 put_unique_function_name(hpc_codegen_context *c, HIR* class_name, HIR* method_name)
 {
   if (class_name) {
-    /* check uniqueness */
     put_symbol(c, class_name);
     PUTS("_");
     put_function_name(c, method_name);
