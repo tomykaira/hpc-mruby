@@ -61,8 +61,8 @@ puts_noescape(hpc_codegen_context *c, const char *str)
     case '\b':
       PUTS("\\b");
       break;
-    case 'f':
-      PUTS("\f");
+    case '\f':
+      PUTS("\\f");
       break;
     case '\n':
       PUTS("\\n");
