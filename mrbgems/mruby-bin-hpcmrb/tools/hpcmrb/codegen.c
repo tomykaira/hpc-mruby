@@ -634,8 +634,12 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
         PUTS("++"); PUTS(counter); PUTS(") {\n");
         INDENT_PP;
         PUTS_INDENT;
+        PUTS("int ai = mrb_gc_arena_save(mrb);\n");
+        PUTS_INDENT;
         PUTS("mrb_value "); put_symbol(c, sym); PUTS(" = "); PUTS("mrb_fixnum_value("); PUTS(counter); PUTS(");\n");
         put_statement(c, CADDDDR(stat), TRUE);
+        PUTS_INDENT;
+        PUTS("mrb_gc_arena_restore(mrb, ai);\n");
         INDENT_MM;
         PUTS_INDENT;
         PUTS("}\n");
