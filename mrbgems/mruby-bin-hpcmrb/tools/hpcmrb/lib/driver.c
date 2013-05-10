@@ -17,6 +17,7 @@ int
 main(int argc, char **argv)
 {
   mrb = mrb_open();
+  mrb->gc_disabled = TRUE;
 
   compiled_main(mrb_top_self(mrb), mrb);
 
