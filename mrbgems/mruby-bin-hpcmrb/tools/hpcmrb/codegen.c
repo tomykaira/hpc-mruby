@@ -35,6 +35,26 @@ static void put_exp(hpc_codegen_context *c, HIR *exp);
 static void put_statement(hpc_codegen_context *c, HIR *stat, int no_brace);
 int length(HIR *list);
 
+static int
+built_in_class_p(hpc_codegen_context *c, mrb_sym sym)
+{
+  const char * name = mrb_sym2name(c->mrb, sym);
+  return (strcmp(name, "Object") == 0
+          || strcmp(name, "Class") == 0
+          || strcmp(name, "Module") == 0
+          || strcmp(name, "Proc") == 0
+          || strcmp(name, "String") == 0
+          || strcmp(name, "Array") == 0
+          || strcmp(name, "Hash") == 0
+          || strcmp(name, "Float") == 0
+          || strcmp(name, "Fixnum") == 0
+          || strcmp(name, "TrueClass") == 0
+          || strcmp(name, "FalseClass") == 0
+          || strcmp(name, "NilClass") == 0
+          || strcmp(name, "Symbol") == 0
+          || strcmp(name, "Kernel") == 0);
+}
+
 static void
 put_header(hpc_codegen_context *c)
 {
@@ -159,6 +179,34 @@ put_var(hpc_codegen_context *c, HIR *hir)
   const char * name = mrb_sym2name(c->mrb, sym);
   if (name[0] == '$') {
     PUTS("G_"); PUTS(name + 1); /* replace $ in global variables */
+  } else if (strcmp(name, "Object") == 0) {
+    PUTS("mrb_obj_value(mrb->object_class)");
+  } else if (strcmp(name, "Class") == 0) {
+    PUTS("mrb_obj_value(mrb->class_class)");
+  } else if (strcmp(name, "Module") == 0) {
+    PUTS("mrb_obj_value(mrb->module_class)");
+  } else if (strcmp(name, "Proc") == 0) {
+    PUTS("mrb_obj_value(mrb->proc_class)");
+  } else if (strcmp(name, "String") == 0) {
+    PUTS("mrb_obj_value(mrb->string_class)");
+  } else if (strcmp(name, "Array") == 0) {
+    PUTS("mrb_obj_value(mrb->array_class)");
+  } else if (strcmp(name, "Hash") == 0) {
+    PUTS("mrb_obj_value(mrb->hash_class)");
+  } else if (strcmp(name, "Float") == 0) {
+    PUTS("mrb_obj_value(mrb->float_class)");
+  } else if (strcmp(name, "Fixnum") == 0) {
+    PUTS("mrb_obj_value(mrb->fixnum_class)");
+  } else if (strcmp(name, "TrueClass") == 0) {
+    PUTS("mrb_obj_value(mrb->true_class)");
+  } else if (strcmp(name, "FalseClass") == 0) {
+    PUTS("mrb_obj_value(mrb->false_class)");
+  } else if (strcmp(name, "NilClass") == 0) {
+    PUTS("mrb_obj_value(mrb->nil_class)");
+  } else if (strcmp(name, "Symbol") == 0) {
+    PUTS("mrb_obj_value(mrb->symbol_class)");
+  } else if (strcmp(name, "Kernel") == 0) {
+    PUTS("mrb_obj_value(mrb->kernel_class)");
   } else {
     PUTS(name);
   }
@@ -321,6 +369,8 @@ put_decl(hpc_codegen_context *c, HIR *decl)
   switch (TYPE(decl)) {
     case HIR_GVARDECL:
     case HIR_LVARDECL:
+      if (built_in_class_p(c, sym(decl->cdr->cdr->car)))
+        return;
       put_vardecl(c, decl->cdr);
       if (TYPE(CADDDR(decl)) != HIR_EMPTY) {
         PUTS(" = ");
@@ -765,7 +815,11 @@ lookup_map(HIR *map, mrb_sym sym, int arg_count)
   return NULL;
 }
 
-/* cf. mrb_instance_new in class.c */
+/*
+  We do not know about built-in classes' initialize.
+  We should define possible cases.
+  cf. mrb_instance_new in class.c
+*/
 void
 put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
 {
