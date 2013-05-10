@@ -25,8 +25,8 @@ module Rand
     t = x ^ ((x & 0xfffff) << 11)
     w = @@w
     @@x, @@y, @@z = @@y, @@z, w
-    w = @@w = (w ^ (w >> 19) ^ (t ^ (t >> 8)))
-    (w % BNUM) / BNUMF
+    @@w = (w ^ (w >> 19) ^ (t ^ (t >> 8)))
+    (@@w % BNUM) / BNUMF
   end
 end
 
