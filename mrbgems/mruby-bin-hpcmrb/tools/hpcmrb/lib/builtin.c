@@ -5,6 +5,7 @@
 #include "mruby/array.h" /* mrb_ary_ref */
 #include <limits.h> /* CHAR_BIT macro */
 #include <string.h> /* memcpy */
+#include <math.h>
 
 #define TYPES2(a,b) ((((uint16_t)(a))<<8)|(((uint16_t)(b))&0xff))
 
@@ -315,4 +316,98 @@ hpc_ary_aset_2(mrb_value __self__, mrb_value index, mrb_value value)
   }
   puts("TYPE_ERROR: expected Fixnum for 1st argument (hpc_ary_aset)");
   return mrb_nil_value();
+}
+
+#define EVAL_FLOAT(num, exp) do {               \
+  mrb_float f;                                  \
+  switch (mrb_type(num)) {                      \
+  case MRB_TT_FIXNUM:                           \
+    f = (mrb_float)mrb_fixnum(num);             \
+    break;                                      \
+  case MRB_TT_FLOAT:                            \
+    f = mrb_float(num);                         \
+    break;                                      \
+  default:                                      \
+    puts("TypeError: can't be coerced into Float"); \
+    return mrb_float_value(nan(""));            \
+  }                                             \
+  return mrb_float_value(exp);                  \
+} while (1)
+
+mrb_value
+sqrt_1(mrb_value __self__, mrb_value num)
+{
+  EVAL_FLOAT(num, sqrt(f));
+}
+
+mrb_value
+cos_1(mrb_value __self__, mrb_value num)
+{
+  EVAL_FLOAT(num, cos(f));
+}
+
+mrb_value
+sin_1(mrb_value __self__, mrb_value num)
+{
+  EVAL_FLOAT(num, sin(f));
+}
+
+mrb_value
+num_uminus_0(mrb_value num)
+{
+  switch (mrb_type(num)) {
+  case MRB_TT_FIXNUM:
+    return mrb_fixnum_value(0 - mrb_fixnum(num));
+  case MRB_TT_FLOAT:
+    return mrb_float_value(0 - mrb_float(num));
+  default:
+    return mrb_funcall(mrb, num, "-@", 0);
+  }
+}
+
+mrb_value
+to_i_0(mrb_value num)
+{
+  switch (mrb_type(num)) {
+  case MRB_TT_FIXNUM:
+    return num;
+  case MRB_TT_FLOAT:
+    return mrb_fixnum_value((mrb_int)mrb_float(num));
+  default:
+    return mrb_funcall(mrb, num, "to_i", 0);
+  }
+}
+
+mrb_value
+to_f_0(mrb_value num)
+{
+  switch (mrb_type(num)) {
+  case MRB_TT_FIXNUM:
+    return mrb_float_value((mrb_float)mrb_fixnum(num));
+  case MRB_TT_FLOAT:
+    return num;
+  default:
+    return mrb_funcall(mrb, num, "to_i", 0);
+  }
+}
+
+mrb_value
+chr_0(mrb_value num)
+{
+  switch (mrb_type(num)) {
+  case MRB_TT_FIXNUM:
+    {
+      char c;
+      c = (char)mrb_fixnum(num);
+      return mrb_str_new(mrb, &c, 1);
+    }
+  default:
+    return mrb_funcall(mrb, num, "chr", 0);
+  }
+}
+
+mrb_value
+to_s_0(mrb_value __self__)
+{
+  return mrb_funcall(mrb, __self__, "to_s", 0);
 }
