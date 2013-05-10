@@ -285,9 +285,13 @@ puts_1(mrb_value __self__, mrb_value n)
 mrb_value
 print_1(mrb_value __self__, mrb_value n)
 {
-  mrb_value str = mrb_funcall(mrb, n, "to_s", 0);
-  const char *cstr = mrb_str_to_cstr(mrb, str);
-  printf("%s", cstr);
+  if (!mrb_string_p(n))
+    n = mrb_funcall(mrb, n, "to_s", 0);
+  const char *cstr = RSTRING_PTR(n);
+  size_t i, len = RSTRING_LEN(n);
+  for (i = 0; i < len; ++i) {
+    putchar(cstr[i]);
+  }
   return mrb_nil_value();
 }
 
