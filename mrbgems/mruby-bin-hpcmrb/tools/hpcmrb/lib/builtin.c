@@ -273,43 +273,17 @@ hpc_fixnum_to_str(mrb_value x, int base)
 mrb_value
 puts_1(mrb_value __self__, mrb_value n)
 {
-  mrb_value str;
-
-  switch (mrb_type(n)) {
-  case MRB_TT_FIXNUM:
-    str = hpc_fixnum_to_str(n, 10);
-    break;
-  case MRB_TT_STRING:
-    str = n;
-    break;
-  default:
-    str = mrb_any_to_s(mrb, n);
-  }
-
+  mrb_value str = mrb_funcall(mrb, n, "to_s", 0);
   const char *cstr = mrb_str_to_cstr(mrb, str);
-  /* calling c puts */
-  printf("%s\n", cstr);
+  puts(cstr);
   return mrb_nil_value();
 }
 
 mrb_value
 print_1(mrb_value __self__, mrb_value n)
 {
-  mrb_value str;
-
-  switch (mrb_type(n)) {
-  case MRB_TT_FIXNUM:
-    str = hpc_fixnum_to_str(n, 10);
-    break;
-  case MRB_TT_STRING:
-    str = n;
-    break;
-  default:
-    str = mrb_any_to_s(mrb, n);
-  }
-
+  mrb_value str = mrb_funcall(mrb, n, "to_s", 0);
   const char *cstr = mrb_str_to_cstr(mrb, str);
-  /* calling c puts */
   printf("%s", cstr);
   return mrb_nil_value();
 }
