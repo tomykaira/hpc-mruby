@@ -31,7 +31,7 @@ typedef struct {
 } hpc_codegen_context;
 
 static void put_decl(hpc_codegen_context *c, HIR *decl);
-static void put_exp(hpc_codegen_context *c, HIR *exp);
+static void put_exp(hpc_codegen_context *c, HIR *exp, int val);
 static void put_statement(hpc_codegen_context *c, HIR *stat, int no_brace);
 int length(HIR *list);
 
@@ -374,7 +374,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
       put_vardecl(c, decl->cdr);
       if (TYPE(CADDDR(decl)) != HIR_EMPTY) {
         PUTS(" = ");
-        put_exp(c, CADDDR(decl));
+        put_exp(c, CADDDR(decl), TRUE);
       }
       PUTS(";\n");
       return;
@@ -402,7 +402,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
   w/o newline, w/o trailing semicolon
  */
 static void
-put_exp(hpc_codegen_context *c, HIR *exp)
+put_exp(hpc_codegen_context *c, HIR *exp, int val)
 {
   switch (TYPE(exp)) {
     case HIR_PRIM:
@@ -452,8 +452,10 @@ put_exp(hpc_codegen_context *c, HIR *exp)
         HIR *args = exp->cdr->cdr;
         put_call_function_name(c, CADR(exp), length(args)-1);
         PUTS("(");
+        put_int(c, val);
+        PUTS(", ");
         while (args) {
-          put_exp(c, args->car);
+          put_exp(c, args->car, TRUE);
           args = args->cdr;
           if (args) {
             PUTS(", ");
@@ -464,11 +466,11 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       return;
     case HIR_COND_OP:
       PUTS("( mrb_bool(");
-      put_exp(c, CADR(exp));
+      put_exp(c, CADR(exp), TRUE);
       PUTS(") ? ");
-      put_exp(c, CADDR(exp));
+      put_exp(c, CADDR(exp), TRUE);
       PUTS(" : ");
-      put_exp(c, CADDDR(exp));
+      put_exp(c, CADDDR(exp), TRUE);
       PUTS(" )");
       return;
     case HIR_DEFCLASS:
@@ -482,7 +484,7 @@ put_exp(hpc_codegen_context *c, HIR *exp)
       {
         HIR *values = exp->cdr;
         while (values) {
-          put_exp(c, values->car);
+          put_exp(c, values->car, TRUE);
           values = values->cdr;
           if (values)
             PUTS(", ");
@@ -495,7 +497,7 @@ put_exp(hpc_codegen_context *c, HIR *exp)
         HIR *exps = exp->cdr->car;
         PUTS("(");
         while (exps) {
-          put_exp(c, exps->car);
+          put_exp(c, exps->car, FALSE);
           if (exps->cdr)
             PUTS(", ");
           exps = exps->cdr;
@@ -570,13 +572,13 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       case HIR_GVAR:
         put_var(c, CADR(stat)->cdr);
         PUTS(" = ");
-        put_exp(c, CADDR(stat));
+        put_exp(c, CADDR(stat), TRUE);
         break;
       case HIR_IVAR:
         PUTS("mrb_iv_set(mrb, __self__, ");
         put_ivar_name(c, CADR(stat)->cdr);
         PUTS(", ");
-        put_exp(c, CADDR(stat));
+        put_exp(c, CADDR(stat), TRUE);
         PUTS(")");
         break;
       }
@@ -585,7 +587,7 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
     case HIR_IFELSE:
       PUTS_INDENT;
       PUTS("if ( mrb_bool(");
-      put_exp(c, CADR(stat));
+      put_exp(c, CADR(stat), TRUE);
       PUTS(") )\n");
       if (CADDR(stat)) {
         put_statement(c, CADDR(stat), FALSE);
@@ -622,10 +624,10 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
         }
         PUTS_INDENT;
         PUTS("mrb_int "); PUTS(counter); PUTS(" = ");
-        PUTS("mrb_fixnum("); put_exp(c, low); PUTS(");\n");
+        PUTS("mrb_fixnum("); put_exp(c, low, TRUE); PUTS(");\n");
         PUTS_INDENT;
         PUTS("mrb_int "); PUTS(last); PUTS(" = ");
-        PUTS("mrb_fixnum("); put_exp(c, high); PUTS(");\n");
+        PUTS("mrb_fixnum("); put_exp(c, high, TRUE); PUTS(");\n");
         PUTS_INDENT;
         PUTS("for (; ");
         PUTS(counter); PUTS(" < "); PUTS(last); PUTS("; ");
@@ -647,7 +649,7 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
     case HIR_WHILE:
       PUTS_INDENT;
       PUTS("while (");
-      put_exp(c, CADR(stat));
+      put_exp(c, CADR(stat), TRUE);
       PUTS(") ");
       put_statement(c, CADDR(stat), FALSE);
       return;
@@ -663,7 +665,7 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       PUTS_INDENT;
       if (stat->cdr) {
         PUTS("return ");
-        put_exp(c, CADR(stat));
+        put_exp(c, CADR(stat), TRUE);
         PUTS(";\n");
       } else {
         PUTS("return mrb_nil_value();\n");
@@ -673,7 +675,7 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       return;
     case HIR_CALL:
       PUTS_INDENT;
-      put_exp(c, stat);
+      put_exp(c, stat, FALSE);
       PUTS(";\n");
       return;
     default:
@@ -691,7 +693,7 @@ has_null_class(HIR *classes)
   return FALSE;
 }
 
-/* mrb_value funname_1(mrb_value __self__, mrb_value arg1) */
+/* mrb_value funname_1(int val, mrb_value __self__, mrb_value arg1) */
 static void
 put_map_decl(hpc_codegen_context *c, const mrb_sym name, const int arg_count)
 {
@@ -700,7 +702,7 @@ put_map_decl(hpc_codegen_context *c, const mrb_sym name, const int arg_count)
 
   PUTS("mrb_value\n");
   put_call_function_name(c, (HIR*)(intptr_t)name, arg_count);
-  PUTS("(mrb_value __self__");
+  PUTS("(int val, mrb_value __self__");
   for (i = 0; i < arg_count; ++i) {
     sprintf(buf, ", mrb_value arg%d", i);
     PUTS(buf);
@@ -711,7 +713,7 @@ put_map_decl(hpc_codegen_context *c, const mrb_sym name, const int arg_count)
 /*
   this does not handle initialize
 
-  mrb_value funname_1(mrb_value __self__, mrb_value arg1) {
+  mrb_value funname_1(int val, mrb_value __self__, mrb_value arg1) {
     struct RClass *c = mrb_obj_class(mrb, __self__);
     if (c == mrb_class_get(mrb, "FirstClass")) {
       FirstClass_funname(__self__, arg1);
@@ -757,7 +759,8 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
       continue;
     }
 
-    PUTS("\tint ai = mrb_gc_arena_save(mrb);\n");
+    PUTS("\tint ai;\n");
+    PUTS("\tif (!val) ai = mrb_gc_arena_save(mrb);\n");
     PUTS("\tmrb_value result;\n");
     PUTS("\tstruct RClass *c = mrb_obj_class(mrb, __self__);\n");
 
@@ -778,7 +781,7 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
             mrb_sym2name(mrb, sym(method->car)), arg_count, arglist);
     PUTS(buf);
     PUTS("\t}\n");
-    PUTS("\tmrb_gc_arena_restore(mrb,  ai);\n");
+    PUTS("\tif (!val) mrb_gc_arena_restore(mrb,  ai);\n");
     PUTS("\treturn result;\n");
     PUTS("}\n\n");
   }
