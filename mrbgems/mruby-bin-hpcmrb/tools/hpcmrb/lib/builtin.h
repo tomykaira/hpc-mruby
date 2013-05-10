@@ -27,3 +27,28 @@ mrb_value print_1(mrb_value __self__, mrb_value n);
 
 mrb_value hpc_ary_aget_1(mrb_value __self__, mrb_value index);
 mrb_value hpc_ary_aset_2(mrb_value __self__, mrb_value index, mrb_value value);
+
+mrb_value sqrt_1(mrb_value __self__, mrb_value n);
+
+mrb_value num_uminus_0(mrb_value n);
+
+mrb_value to_i_0(mrb_value n);
+
+mrb_value to_f_0(mrb_value n);
+
+mrb_value chr_0(mrb_value x);
+
+mrb_value rand_0(mrb_value __self__);
+
+mrb_value cos_1(mrb_value __self__, mrb_value n);
+
+mrb_value sin_1(mrb_value __self__, mrb_value n);
+
+mrb_value to_s_0(mrb_value n);
+
+/* probably not occured in compile_main */
+mrb_value hpc_flo_to_s(mrb_value f);
+
+mrb_value hpc_fix_to_s(mrb_value x);
+
+mrb_value hpc_str_plus(mrb_value a, mrb_value b);
