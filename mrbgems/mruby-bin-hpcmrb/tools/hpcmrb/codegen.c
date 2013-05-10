@@ -443,6 +443,11 @@ put_exp(hpc_codegen_context *c, HIR *exp, int val)
       put_ivar_name(c, exp->cdr);
       PUTS(")");
       break;
+    case HIR_CVAR:
+      PUTS("mrb_cv_get(mrb, __self__, ");
+      put_ivar_name(c, exp->cdr);
+      PUTS(")");
+      break;
     case HIR_CALL:
       /* FIXME: expects
          - func is symbol
@@ -576,6 +581,13 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
         break;
       case HIR_IVAR:
         PUTS("mrb_iv_set(mrb, __self__, ");
+        put_ivar_name(c, CADR(stat)->cdr);
+        PUTS(", ");
+        put_exp(c, CADDR(stat), TRUE);
+        PUTS(")");
+        break;
+      case HIR_CVAR:
+        PUTS("mrb_cv_set(mrb, __self__, ");
         put_ivar_name(c, CADR(stat)->cdr);
         PUTS(", ");
         put_exp(c, CADDR(stat), TRUE);

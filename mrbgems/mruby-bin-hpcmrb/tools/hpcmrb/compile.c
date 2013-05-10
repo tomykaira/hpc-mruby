@@ -524,6 +524,14 @@ new_ivar(hpc_state *p, mrb_sym sym)
 }
 
 static HIR*
+new_cvar(hpc_state *p, mrb_sym sym)
+{
+  HIR *var = cons((HIR*)HIR_CVAR, hirsym(sym));
+  var->lat = lat_unknown;
+  return var;
+}
+
+static HIR*
 dup_lvar(hpc_state *p, HIR *lvar)
 {
   HIR *hir = cons(lvar->car, lvar->cdr);
@@ -756,6 +764,7 @@ typedef struct scope {
   int inherit_defs;
   HIR *lv;
   HIR *iv;
+  HIR *cv;
   mrb_sym class_name;
   int sp;
 
@@ -898,6 +907,7 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, int inherit_defs, int inherit_
   if (inherit_defs) {
     s->defs = prev->defs;
     s->iv   = prev->iv;
+    s->cv   = prev->cv;
     s->class_name = prev->class_name;
   }
   if (inherit_lv) {
@@ -928,6 +938,7 @@ scope_finish(hpc_scope *s)
   if (s->inherit_defs) {
     s->prev->defs = s->defs;
     s->prev->iv   = s->iv;
+    s->prev->cv   = s->cv;
   }
   mrb_gc_arena_restore(mrb, s->ai);
   mrb_pool_close(s->mpool);
@@ -1079,6 +1090,18 @@ lookup_ivar(hpc_scope *s, mrb_sym sym)
   return var;
 }
 
+static HIR*
+lookup_cvar(hpc_scope *s, mrb_sym sym)
+{
+  hpc_state *p = s->hpc;
+  HIR* var = find_var_list(p, s->cv, sym);
+  if (!var) {
+    var = new_cvar(p, sym);
+    s->cv = cons(var, s->cv);
+  }
+  return var;
+}
+
 static void
 register_class_definition(hpc_state *p, mrb_sym name, node *tree)
 {
@@ -1131,6 +1154,7 @@ insert_return_at_last(hpc_state *p, HIR *hir)
   case HIR_LVAR:
   case HIR_GVAR:
   case HIR_IVAR:
+  case HIR_CVAR:
   case HIR_CALL:
     return new_return_value(p, hir);
   default:
@@ -1411,6 +1435,7 @@ typing_assign(hpc_scope *s, node *tree)
   case NODE_LVAR:
   case NODE_CONST:
   case NODE_IVAR:
+  case NODE_CVAR:
     return new_assign(p, typing(s, lhs), rhs);
   case NODE_CALL:
     {
@@ -1564,6 +1589,9 @@ typing(hpc_scope *s, node *tree)
       /* This node will be translated later using information of call-sites */
       add_def(s, tree);
       return new_empty(p);
+    case NODE_SDEF:
+      add_def(s, tree->cdr);
+      return new_empty(p);
     case NODE_IF:
       {
         HIR *ifthen = 0, *ifelse = 0, *cond = typing(s, tree->car);
@@ -1579,6 +1607,8 @@ typing(hpc_scope *s, node *tree)
       return lookup_lvar(s, sym(tree));
     case NODE_IVAR:
       return lookup_ivar(s, sym(tree));
+    case NODE_CVAR:
+      return lookup_cvar(s, sym(tree));
     case NODE_SELF:
       return s->current_self;
     case NODE_RETURN:
@@ -1589,6 +1619,21 @@ typing(hpc_scope *s, node *tree)
       }
     case NODE_ASGN:
       return typing_assign(s, tree);
+    case NODE_MASGN:
+      if ((intptr_t)tree->cdr->car != NODE_ARRAY) {
+        NOT_IMPLEMENTED();
+      }
+      {
+        HIR *assigns = 0;
+        node *lhs = tree->car->car;
+        node *rhs = tree->cdr->cdr;
+        while (lhs) {
+          assigns = cons(typing_assign(s, (node *)cons((HIR*)lhs->car, (HIR*)rhs->car)), assigns);
+          lhs = lhs->cdr;
+          rhs = rhs->cdr;
+        }
+        return new_block(p, assigns);
+      }
     case NODE_CONST:
     case NODE_GVAR:
       {
@@ -1600,8 +1645,13 @@ typing(hpc_scope *s, node *tree)
         return gvar;
       }
     case NODE_MODULE:
-      return new_empty(p);
-      NOT_IMPLEMENTED();
+      {
+        mrb_sym class_name = sym(tree->car->cdr);
+        HIR *rhs = new_defclass(p, class_name, 0);
+        register_class_definition(p, class_name, tree);
+        collect_class_defs(s, class_name, tree->cdr->car->cdr);
+        return new_assign(p, new_gvar(p, class_name, lat_unknown), rhs);
+      }
     case NODE_CLASS:
       {
         mrb_sym class_name = sym(tree->car->cdr);
