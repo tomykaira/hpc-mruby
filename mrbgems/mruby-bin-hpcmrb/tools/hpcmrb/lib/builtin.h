@@ -12,6 +12,12 @@ mrb_value num_mul_1(int val, mrb_value, mrb_value);
 
 mrb_value num_div_1(int val, mrb_value, mrb_value);
 
+mrb_value num_xor_1(int val, mrb_value a, mrb_value b);
+mrb_value num_lshift_1(int val, mrb_value a, mrb_value b);
+mrb_value num_rshift_1(int val, mrb_value a, mrb_value b);
+mrb_value num_and_1(int val, mrb_value a, mrb_value b);
+mrb_value num_mod_1(int val, mrb_value a, mrb_value b);
+
 mrb_value num_eq_1(int val, mrb_value, mrb_value);
 
 mrb_value num_lt_1(int val, mrb_value, mrb_value);
@@ -33,7 +39,6 @@ mrb_value num_uminus_0(int val, mrb_value __self__);
 mrb_value to_i_0(int val, mrb_value __self__);
 mrb_value to_f_0(int val, mrb_value __self__);
 mrb_value chr_0(int val, mrb_value __self__);
-mrb_value rand_0(int val, mrb_value __self__);
 mrb_value cos_1(int val, mrb_value __self__, mrb_value);
 mrb_value sin_1(int val, mrb_value __self__, mrb_value);
 mrb_value to_s_0(int val, mrb_value __self__);

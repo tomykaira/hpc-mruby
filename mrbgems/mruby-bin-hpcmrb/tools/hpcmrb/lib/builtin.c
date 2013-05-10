@@ -165,6 +165,42 @@ num_div_1(int val, mrb_value a, mrb_value b)
   }
 }
 
+#define BINOP(op)                               \
+  mrb_int x, y;                                 \
+  x = mrb_fixnum(a);                            \
+  y = mrb_fixnum(b);                            \
+  return mrb_fixnum_value(x op y);              \
+
+mrb_value
+num_xor_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(^)
+}
+
+mrb_value
+num_lshift_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(<<)
+}
+
+mrb_value
+num_rshift_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(>>)
+}
+
+mrb_value
+num_and_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(&)
+}
+
+mrb_value
+num_mod_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(%)
+}
+
 #define OP_CMP_BODY(op,v1,v2) do {\
   if (a.value.v1 op b.value.v2) {\
     return mrb_true_value();\
@@ -429,11 +465,4 @@ mrb_value
 to_s_0(int val, mrb_value __self__)
 {
   return mrb_funcall(mrb, __self__, "to_s", 0);
-}
-
-mrb_value
-rand_0(int val, mrb_value __self__)
-{
-  mrb_float x = rand() / (mrb_float)RAND_MAX;
-  return mrb_float_value(x);
 }
