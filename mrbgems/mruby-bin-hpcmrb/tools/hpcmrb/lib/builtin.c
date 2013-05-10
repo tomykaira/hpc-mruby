@@ -191,8 +191,9 @@ num_div_1(mrb_value a, mrb_value b)
 mrb_value
 num_eq_1(mrb_value a, mrb_value b)
 {
-  if(mrb_obj_eq(NULL, a, b)) {
-    return mrb_true_value();
+  if (mrb_type(a) != MRB_TT_FIXNUM
+      && mrb_type(a) != MRB_TT_FLOAT) {
+    return mrb_bool_value(mrb_obj_eq(mrb, a, b));
   }
   else {
     OP_CMP(==);
@@ -297,7 +298,7 @@ bob_not_0(mrb_value __self__)
 mrb_value
 hpc_ary_aget_1(mrb_value __self__, mrb_value index)
 {
-  if(mrb_type(index) != MRB_TT_FIXNUM){
+  if(mrb_type(index) == MRB_TT_FIXNUM){
     return mrb_ary_ref(mrb, __self__, mrb_fixnum(index));
   }
   puts("TYPE_ERROR: expected Fixnum for 1st argument (hpc_ary_aget)");
@@ -308,7 +309,7 @@ mrb_value
 hpc_ary_aset_2(mrb_value __self__, mrb_value index, mrb_value value)
 {
 
-  if(mrb_type(index) != MRB_TT_FIXNUM){
+  if(mrb_type(index) == MRB_TT_FIXNUM){
     mrb_ary_set(mrb, __self__, mrb_fixnum(index), value);
     return value;
   }
