@@ -341,9 +341,7 @@ put_ivar_name(hpc_codegen_context *c, HIR *hir)
   mrb_sym sym = (intptr_t)hir;
   const char * name = mrb_sym2name(c->mrb, sym);
 
-  PUTS("mrb_intern(mrb, \"");
-  PUTS(name + 1);                /* skip @ */
-  PUTS("\")");
+  PUTS("__i_"); PUTS(name + 1);
 }
 
 static void
@@ -352,9 +350,7 @@ put_cvar_name(hpc_codegen_context *c, HIR *hir)
   mrb_sym sym = (intptr_t)hir;
   const char * name = mrb_sym2name(c->mrb, sym);
 
-  PUTS("mrb_intern(mrb, \"");
-  PUTS(name + 2);                /* skip @@ */
-  PUTS("\")");
+  PUTS("__i_"); PUTS(name + 2);
 }
 
 static void
@@ -863,6 +859,52 @@ put_fun_decls(hpc_codegen_context *c, HIR *hir, HIR *map)
   next:
     map = map->cdr;
   }
+  PUTS("\n");
+}
+
+void
+put_intern_table(hpc_codegen_context *c, HIR *names)
+{
+  HIR *original_names = names;
+  while (names) {
+    HIR * var = names->car;
+    const char * name = mrb_sym2name(c->mrb, sym(var->cdr));
+    switch (TYPE(var)) {
+    case HIR_IVAR:
+      name += 1;                /* skip @ */
+      break;
+    case HIR_CVAR:
+      name += 2;                /* skip @@ */
+      break;
+    default:
+      NOT_REACHABLE();
+    }
+    PUTS("mrb_sym "); PUTS("__i_"); PUTS(name); PUTS(";\n");
+
+    names = names->cdr;
+  }
+  PUTS("\n");
+
+  names = original_names;
+  PUTS("void\ninit_global_syms(mrb_state * mrb)\n{\n");
+  while (names) {
+    HIR * var = names->car;
+    const char * name = mrb_sym2name(c->mrb, sym(var->cdr));
+    switch (TYPE(var)) {
+    case HIR_IVAR:
+      name += 1;                /* skip @ */
+      break;
+    case HIR_CVAR:
+      name += 2;                /* skip @@ */
+      break;
+    default:
+      NOT_REACHABLE();
+    }
+    PUTS("\t__i_"); PUTS(name); PUTS(" = mrb_intern(mrb, \""); PUTS(name); PUTS("\");\n");
+
+    names = names->cdr;
+  }
+  PUTS("}\n");
 }
 
 HIR *
@@ -976,6 +1018,7 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   put_header(&c);
   /* toplevel is a list of decls */
   put_fun_decls(&c, hir, s->function_map);
+  put_intern_table(&c, s->intern_names);
   put_new_decls(&c, s->function_map, 4);
   put_class_init_decls(&c, s->class_inits);
   while (hir) {

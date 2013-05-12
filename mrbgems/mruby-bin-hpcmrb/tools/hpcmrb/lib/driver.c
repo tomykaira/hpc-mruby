@@ -10,6 +10,7 @@
 #include <string.h>
 
 extern void compiled_main(mrb_value, mrb_state *);
+extern void init_global_syms(mrb_state *);
 
 mrb_state *mrb;
 
@@ -20,6 +21,7 @@ main(int argc, char **argv)
   mrb = mrb_open();
   debug_fp = fopen("result.ppm", "w");
 
+  init_global_syms(mrb);
   compiled_main(mrb_top_self(mrb), mrb);
 
   fclose(debug_fp);

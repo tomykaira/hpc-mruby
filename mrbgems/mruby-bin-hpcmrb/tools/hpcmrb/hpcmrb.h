@@ -95,6 +95,7 @@ typedef struct hpc_state {
   HIR *classes;                 /* found class definitions */
   HIR *function_map;            /* list ((fun name . arg count) . list ((class name . sdefp))) */
   HIR *class_inits;             /* list (class_name . initializer statement) */
+  HIR *intern_names;            /* name table to declare statically */
   int temp_counter;             /* temp name counter */
   short line;
   jmp_buf jmp;

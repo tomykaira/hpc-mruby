@@ -1096,6 +1096,7 @@ lookup_ivar(hpc_scope *s, mrb_sym sym)
   if (!var) {
     var = new_ivar(p, sym);
     s->iv = cons(var, s->iv);
+    p->intern_names = cons(var, p->intern_names);
   }
   return var;
 }
@@ -1108,6 +1109,7 @@ lookup_cvar(hpc_scope *s, mrb_sym sym)
   if (!var) {
     var = new_cvar(p, sym);
     s->cv = cons(var, s->cv);
+    p->intern_names = cons(var, p->intern_names);
   }
   return var;
 }
