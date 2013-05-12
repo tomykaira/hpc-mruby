@@ -18,11 +18,11 @@ int
 main(int argc, char **argv)
 {
   mrb = mrb_open();
-  debug_fp = fopen("result.ppm", "w");
+  //debug_fp = fopen("result.ppm", "w");
 
   compiled_main(mrb_top_self(mrb), mrb);
 
-  fclose(debug_fp);
+  //fclose(debug_fp);
   mrb_close(mrb);
 
   return 0;
