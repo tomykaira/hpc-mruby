@@ -347,6 +347,17 @@ put_ivar_name(hpc_codegen_context *c, HIR *hir)
 }
 
 static void
+put_cvar_name(hpc_codegen_context *c, HIR *hir)
+{
+  mrb_sym sym = (intptr_t)hir;
+  const char * name = mrb_sym2name(c->mrb, sym);
+
+  PUTS("mrb_intern(mrb, \"");
+  PUTS(name + 2);                /* skip @@ */
+  PUTS("\")");
+}
+
+static void
 put_fundecl_decl(hpc_codegen_context *c, HIR *decl)
 {
   HIR *funtype = CADR(decl);
@@ -424,7 +435,7 @@ put_exp(hpc_codegen_context *c, HIR *exp, int val)
       }
     case HIR_INT:
       PUTS("mrb_fixnum_value(");
-      if (CADDR(exp) == 16)
+      if ((intptr_t)CADDR(exp) == 16)
         PUTS("0x");
       PUTS((char *)CADR(exp));
       PUTS(")");
@@ -452,7 +463,7 @@ put_exp(hpc_codegen_context *c, HIR *exp, int val)
       break;
     case HIR_CVAR:
       PUTS("mrb_cv_get(mrb, __self__, ");
-      put_ivar_name(c, exp->cdr);
+      put_cvar_name(c, exp->cdr);
       PUTS(")");
       break;
     case HIR_CALL:
@@ -484,12 +495,6 @@ put_exp(hpc_codegen_context *c, HIR *exp, int val)
       PUTS(" : ");
       put_exp(c, CADDDR(exp), TRUE);
       PUTS(" )");
-      return;
-    case HIR_DEFCLASS:
-      /* mrb_define_class(mrb, NAME, mrb->object_class) */
-      PUTS("mrb_obj_value(mrb_define_class(mrb, \"");
-      put_symbol(c, CADR(exp));
-      PUTS("\", mrb->object_class))");
       return;
     case HIR_INIT_LIST:
       PUTS("{");
@@ -595,7 +600,7 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
         break;
       case HIR_CVAR:
         PUTS("mrb_cv_set(mrb, __self__, ");
-        put_ivar_name(c, CADR(stat)->cdr);
+        put_cvar_name(c, CADR(stat)->cdr);
         PUTS(", ");
         put_exp(c, CADDR(stat), TRUE);
         PUTS(")");
@@ -694,12 +699,26 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
         PUTS("return mrb_nil_value();\n");
       }
       return;
+    case HIR_DEFCLASS:
+      /* mrb_value NAME = mrb_define_class(mrb, NAME, mrb->object_class) */
+      PUTS_INDENT;
+      put_var(c, CADR(stat));
+      PUTS(" = ");
+      PUTS("mrb_obj_value(mrb_define_class(mrb, \"");
+      put_symbol(c, CADR(stat));
+      PUTS("\", mrb->object_class));\n");
+      PUTS_INDENT;
+      put_symbol(c, CADR(stat)); PUTS("_init("); put_var(c, CADR(stat)); PUTS(");\n");
+      return;
     case HIR_EMPTY:
       return;
     case HIR_CALL:
       PUTS_INDENT;
       put_exp(c, stat, FALSE);
       PUTS(";\n");
+      return;
+    case HIR_LVARDECL:
+      put_decl(c, stat);
       return;
     default:
       NOT_REACHABLE();
@@ -710,7 +729,7 @@ static int
 has_null_class(HIR *classes)
 {
   while (classes) {
-    if (!classes->car) return TRUE;
+    if (!classes->car->car) return TRUE;
     classes = classes->cdr;
   }
   return FALSE;
@@ -774,7 +793,7 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
 
     if (has_null_class(classes)) {
       PUTS("\treturn ");
-      put_unique_function_name(c, classes->car, method->car);
+      put_unique_function_name(c, 0, method->car);
       PUTS("(__self__");
       PUTS(arglist);
       PUTS(");\n}");
@@ -788,13 +807,26 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
     PUTS("\tstruct RClass *c = mrb_obj_class(mrb, __self__);\n");
 
     while (classes) {
-      PUTS("\tif (c == mrb_class_get(mrb, \"");
-      put_symbol(c, classes->car);
-      PUTS("\")) {\n\t\tresult = ");
-      put_unique_function_name(c, classes->car, method->car);
-      PUTS("(__self__");
-      PUTS(arglist);
-      PUTS(");\n\t} else ");
+      HIR * klass = classes->car;
+      HIR * name = klass->car;
+      int sdefp = (intptr_t)klass->cdr;
+
+      if (sdefp) {
+        PUTS("\tif (mrb_eql(mrb, __self__, "); put_symbol(c, name);
+        PUTS(")) {\n\t\tresult = ");
+        put_unique_function_name(c, name, method->car);
+        PUTS("(__self__");
+        PUTS(arglist);
+        PUTS(");\n\t} else ");
+      } else {
+        PUTS("\tif (c == mrb_class_get(mrb, \"");
+        put_symbol(c, name);
+        PUTS("\")) {\n\t\tresult = ");
+        put_unique_function_name(c, name, method->car);
+        PUTS("(__self__");
+        PUTS(arglist);
+        PUTS(");\n\t} else ");
+      }
 
       classes = classes->cdr;
     }
@@ -903,6 +935,32 @@ put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
   }
 }
 
+void
+put_class_inits(hpc_codegen_context *c, HIR* class_inits)
+{
+  while (class_inits) {
+    HIR* name = class_inits->car->car;
+    HIR* body = class_inits->car->cdr;
+    PUTS("void\n");
+    put_symbol(c, name); PUTS("_init(mrb_value __self__)\n");
+    PUTS("{\n");
+    INDENT_PP;
+    put_statement(c, body, TRUE);
+    INDENT_MM;
+    PUTS("}\n\n");
+    class_inits = class_inits->cdr;
+  }
+}
+
+void
+put_class_init_decls(hpc_codegen_context *c, HIR* class_inits)
+{
+  while (class_inits) {
+    PUTS("void "); put_symbol(c, class_inits->car->car); PUTS("_init(mrb_value __self__);\n");
+    class_inits = class_inits->cdr;
+  }
+}
+
 mrb_value
 hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
 {
@@ -918,10 +976,12 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   /* toplevel is a list of decls */
   put_fun_decls(&c, hir, s->function_map);
   put_new_decls(&c, s->function_map, 4);
+  put_class_init_decls(&c, s->class_inits);
   while (hir) {
     put_decl(&c, hir->car);
     hir = hir->cdr;
   }
+  put_class_inits(&c, s->class_inits);
   put_multiplexers(&c, s);
 
   return mrb_fixnum_value(0);

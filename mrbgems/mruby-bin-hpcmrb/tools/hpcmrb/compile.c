@@ -473,6 +473,8 @@ append(hpc_state *p, HIR *list1, HIR *list2)
   return orig_list1;
 }
 
+#define unshift(x, y) (x = append(p, (x), list1(y)))
+
 static mrb_sym
 attrsym(hpc_state *p, mrb_sym a)
 {
@@ -487,6 +489,14 @@ attrsym(hpc_state *p, mrb_sym a)
   name2[len+1] = '\0';
 
   return mrb_intern2(p->mrb, name2, len+1);
+}
+
+static mrb_sym
+temp_sym(hpc_state *p)
+{
+  char name[32];
+  sprintf(name, "__tmp_%d", p->temp_counter++);
+  return mrb_intern(p->mrb, name);
 }
 
 hpc_state*
@@ -1425,11 +1435,9 @@ typing_call(hpc_scope *s, node *tree)
 }
 
 static HIR*
-typing_assign(hpc_scope *s, node *tree)
+typing_assign(hpc_scope *s, node *lhs, HIR *rhs)
 {
   hpc_state *p = s->hpc;
-  node *lhs = tree->car;
-  HIR *rhs = typing(s, tree->cdr);
   switch ((intptr_t)lhs->car) {
   case NODE_GVAR:
   case NODE_LVAR:
@@ -1490,7 +1498,7 @@ typing_def(hpc_scope *s, node *ast)
 }
 
 static void
-update_function_map(hpc_state *p, HIR *fundecl)
+update_function_map(hpc_state *p, HIR *fundecl, int sdefp)
 {
   HIR *map = p->function_map;
   HIR *class_name  = fundecl->cdr->cdr->car->car;
@@ -1500,24 +1508,24 @@ update_function_map(hpc_state *p, HIR *fundecl)
   while (map) {
     if (map->car->car->car == method_name &&
         (intptr_t)map->car->car->cdr == arg_count) {
-      map->car->cdr = cons(class_name, map->car->cdr);
+      map->car->cdr = cons(cons(class_name, (HIR*)sdefp), map->car->cdr);
       return;
     }
     map = map->cdr;
   }
   /* not found */
   p->function_map = cons(cons(cons(method_name, (HIR*)arg_count),
-                              list1(class_name)),
+                              list1(cons(class_name, (HIR*)sdefp))),
                          p->function_map);
 }
 
 static void
-add_def(hpc_scope *s, node *tree)
+add_def(hpc_scope *s, node *tree, int sdefp)
 {
   hpc_state *p = s->hpc;
   HIR *fundecl = typing_def(s, tree);
   s->defs = cons(fundecl, s->defs);
-  update_function_map(p, fundecl);
+  update_function_map(p, fundecl, sdefp);
 }
 
 static void
@@ -1525,16 +1533,17 @@ collect_class_defs(hpc_scope *s, mrb_sym name, node *body)
 {
   hpc_state *p = s->hpc;
   hpc_scope *class_scope = scope_new(p, s, 0, FALSE, FALSE);
-  HIR *defs;
+  HIR *defs, *initializer;
 
   class_scope->class_name = name;
-  typing(class_scope, body); /* collect defs */
+  initializer = typing(class_scope, body); /* collect defs */
 
   defs = class_scope->defs;
   while (defs) {
     s->defs = cons(defs->car, s->defs);
     defs = defs->cdr;
   }
+  p->class_inits = cons(cons(hirsym(name), initializer), p->class_inits);
 
   scope_finish(class_scope);
 }
@@ -1587,10 +1596,10 @@ typing(hpc_scope *s, node *tree)
       return new_float(p, (char *)tree, 10, str_to_mrb_float((char *)tree));
     case NODE_DEF:
       /* This node will be translated later using information of call-sites */
-      add_def(s, tree);
+      add_def(s, tree, FALSE);
       return new_empty(p);
     case NODE_SDEF:
-      add_def(s, tree->cdr);
+      add_def(s, tree->cdr, TRUE);
       return new_empty(p);
     case NODE_IF:
       {
@@ -1618,7 +1627,7 @@ typing(hpc_scope *s, node *tree)
         return new_return_void(p);
       }
     case NODE_ASGN:
-      return typing_assign(s, tree);
+      return typing_assign(s, tree->car, typing(s, tree->cdr));
     case NODE_MASGN:
       if ((intptr_t)tree->cdr->car != NODE_ARRAY) {
         NOT_IMPLEMENTED();
@@ -1627,10 +1636,22 @@ typing(hpc_scope *s, node *tree)
         HIR *assigns = 0;
         node *lhs = tree->car->car;
         node *rhs = tree->cdr->cdr;
-        while (lhs) {
-          assigns = cons(typing_assign(s, (node *)cons((HIR*)lhs->car, (HIR*)rhs->car)), assigns);
-          lhs = lhs->cdr;
+        HIR *temps = 0;
+
+        while (rhs) {
+          mrb_sym temp = temp_sym(p);
+          HIR *hir_rhs = typing(s, rhs->car);
+          HIR *lvar = new_lvar(p, temp, hir_rhs->lat);
+
+          unshift(assigns, new_lvardecl(p, infer_type(p, hir_rhs->lat), temp, hir_rhs));
+          unshift(temps, lvar);
+
           rhs = rhs->cdr;
+        }
+        while (lhs) {
+          unshift(assigns, typing_assign(s, lhs->car, temps->car));
+          lhs = lhs->cdr;
+          temps = temps->cdr;
         }
         return new_block(p, assigns);
       }
@@ -1647,18 +1668,16 @@ typing(hpc_scope *s, node *tree)
     case NODE_MODULE:
       {
         mrb_sym class_name = sym(tree->car->cdr);
-        HIR *rhs = new_defclass(p, class_name, 0);
         register_class_definition(p, class_name, tree);
         collect_class_defs(s, class_name, tree->cdr->car->cdr);
-        return new_assign(p, new_gvar(p, class_name, lat_unknown), rhs);
+        return new_defclass(p, class_name, 0);
       }
     case NODE_CLASS:
       {
         mrb_sym class_name = sym(tree->car->cdr);
-        HIR *rhs = new_defclass(p, class_name, 0);
         register_class_definition(p, class_name, tree);
         collect_class_defs(s, class_name, tree->cdr->cdr->car->cdr);
-        return new_assign(p, new_gvar(p, class_name, lat_unknown), rhs);
+        return new_defclass(p, class_name, 0);
       }
     case NODE_STR:
       return new_str(p, (char*)tree->car, (int)(intptr_t)tree->cdr);

@@ -35,6 +35,7 @@ enum hir_type {
   HIR_BREAK,      /* (:HIR_BREAK) */
   HIR_CONTINUE,   /* (:HIR_CONTINUE) */
   HIR_RETURN,     /* (:HIR_RETURN) or (:HIR_RETURN exp) */
+  HIR_DEFCLASS,   /* (:HIR_DEFCLASS sym super) super is not supported */
 
   /* expressions */
   HIR_EMPTY,      /* (:HIR_EMPTY) */
@@ -48,7 +49,6 @@ enum hir_type {
   HIR_CVAR,       /* (:HIR_CVAR . symbol) */
   HIR_CALL,       /* (:HIR_CALL func args...) */
   HIR_COND_OP,    /* (:HIR_COND_OP cond t f) t and f are exp */
-  HIR_DEFCLASS,   /* (:HIR_DEFCLASS sym super) super is not supported */
 };
 
 enum hir_primitive_type {
@@ -93,7 +93,9 @@ typedef struct hpc_state {
   HIR *cells;
   HIR *gvars;                   /* found global variables */
   HIR *classes;                 /* found class definitions */
-  HIR *function_map;            /* list ((fun name . arg count) . list (class name)) */
+  HIR *function_map;            /* list ((fun name . arg count) . list ((class name . sdefp))) */
+  HIR *class_inits;             /* list (class_name . initializer statement) */
+  int temp_counter;             /* temp name counter */
   short line;
   jmp_buf jmp;
 } hpc_state;
