@@ -800,7 +800,7 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
     PUTS("\tint ai;\n");
     PUTS("\tif (!val) ai = mrb_gc_arena_save(mrb);\n");
     PUTS("\tmrb_value result;\n");
-    PUTS("\tstruct RClass *c = mrb_obj_class(mrb, __self__);\n");
+    PUTS("\tstruct RClass *c = mrb_obj_ptr(__self__)->c;\n");
 
     while (classes) {
       HIR * klass = classes->car;
