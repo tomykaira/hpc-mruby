@@ -819,9 +819,9 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
         PUTS(arglist);
         PUTS(");\n\t} else ");
       } else {
-        PUTS("\tif (c == mrb_class_get(mrb, \"");
+        PUTS("\tif (c == (struct RClass *)mrb_obj_ptr(");
         put_symbol(c, name);
-        PUTS("\")) {\n\t\tresult = ");
+        PUTS(")) {\n\t\tresult = ");
         put_unique_function_name(c, name, method->car);
         PUTS("(__self__");
         PUTS(arglist);
@@ -911,10 +911,11 @@ put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
     PUTS("\tobj = mrb_obj_value(o);\n");
 
     while (classes) {
-      PUTS("\tif (c == mrb_class_get(mrb, \"");
-      put_symbol(c, classes->car);
+      HIR *name = classes->car->car;
+      PUTS("\tif (c == mrb_class_get(mrb, \""); /* TODO: use mrb_obj_ptr */
+      put_symbol(c, name);
       PUTS("\")) {\n\t\t");
-      put_unique_function_name(c, classes->car, (HIR *)(intptr_t)c->mrb->init_sym);
+      put_unique_function_name(c, name, (HIR *)(intptr_t)c->mrb->init_sym);
       PUTS("(obj");
       PUTS(arglist);
       PUTS(");\n\t} else ");
