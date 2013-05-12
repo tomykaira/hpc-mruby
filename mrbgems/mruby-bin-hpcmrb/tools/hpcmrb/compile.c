@@ -665,7 +665,6 @@ static HIR*
 new_assign(hpc_state *p, HIR *lhs, HIR *rhs)
 {
   HIR *hir = list3((HIR*)HIR_ASSIGN, lhs, rhs);
-  mrb_p(p->mrb, lhs->lat);
   lhs->lat = lat_join(p->mrb, lhs->lat, rhs->lat);
   hir->lat = rhs->lat;
   return hir;
@@ -1043,9 +1042,6 @@ static HIR *typing(hpc_scope *s, node *tree);
 static HIR*
 infer_type(hpc_state *p, mrb_value lat)
 {
-  /* TODO: infer type from lattice */
-  puts("Infer type:");
-  mrb_p(p->mrb, lat);
   return value_type;
 }
 
@@ -1724,7 +1720,6 @@ compile(hpc_state *p, node *ast)
 {
   HIR *topdecls;
   hpc_scope *scope = scope_new(p, 0, 0, FALSE, FALSE);
-  parser_dump(p->mrb, ast, 0);
   HIR *main_body = typing(scope, ast);
 
   HIR *params = list2(
