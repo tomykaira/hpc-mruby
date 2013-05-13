@@ -1717,7 +1717,7 @@ compile(hpc_state *p, node *ast)
   topdecls = cons(main_fun, 0);
 
   top_class->methods = scope->defs;
-  push(p->classes, top_class);
+  push(p->classes, (HIR*)top_class);
 
   while (p->gvars) {
     HIR *gvar = p->gvars->car;
