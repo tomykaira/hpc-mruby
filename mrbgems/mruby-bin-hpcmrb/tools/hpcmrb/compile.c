@@ -892,7 +892,7 @@ readint_mrb_int(hpc_scope *s, const char *p, int base, int neg, int *overflow)
 }
 
 static hpc_scope*
-scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, hpc_class *class, int inherit_defs, int inherit_lv)
+scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, hpc_class *class, int inherit_lv)
 {
   static const hpc_scope hpc_scope_zero = { 0 };
   mrb_pool *pool = mrb_pool_open(p->mrb);
@@ -918,8 +918,9 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, hpc_class *class, int inherit_
 
   if (!prev) return s;
 
-  if (inherit_defs) {
+  if (!class) {
     s->defs = prev->defs;
+    s->inherit_defs = TRUE;
   }
   if (inherit_lv) {
     /* append prev->lv after lv, not to destroy prev->lv */
@@ -927,7 +928,6 @@ scope_new(hpc_state *p, hpc_scope *prev, HIR *lv, hpc_class *class, int inherit_
   } else {
     s->lv = lv;
   }
-  s->inherit_defs = inherit_defs;
 
   s->prev = prev;
   s->ainfo = -1;
@@ -1197,7 +1197,7 @@ typing_scope(hpc_scope *s, node *tree)
     n = n->cdr;
   }
 
-  hpc_scope *scope = scope_new(p, s, lv, NULL, TRUE, TRUE);
+  hpc_scope *scope = scope_new(p, s, lv, NULL, TRUE);
   hir = new_scope(p, lvs_to_decls(p, scope->lv), typing(scope, tree->cdr));
   scope_finish(scope);
   return hir;
@@ -1387,7 +1387,7 @@ typing_block(hpc_scope *prev_scope, node *lv_tree, node *margs, node *n_body, in
     lv_tree = lv_tree->cdr;
   }
 
-  scope = scope_new(p, prev_scope, lv, NULL, TRUE, inherit_lvar);
+  scope = scope_new(p, prev_scope, lv, NULL, inherit_lvar);
   body = new_scope(p, lvs_to_decls(p, non_pv_lv), typing(scope, n_body));
 
   return cons((HIR*)scope, body);
@@ -1522,7 +1522,7 @@ collect_class_defs(hpc_scope *s, mrb_sym name, node *body)
 {
   hpc_state *p = s->hpc;
   hpc_class *class = hpc_class_new(p, name);
-  hpc_scope *class_scope = scope_new(p, s, 0, class, FALSE, FALSE);
+  hpc_scope *class_scope = scope_new(p, s, 0, class, FALSE);
 
   class->initializer = typing(class_scope, body); /* collect defs */
   class->methods = class_scope->defs;
@@ -1704,7 +1704,7 @@ compile(hpc_state *p, node *ast)
 {
   HIR *topdecls;
   hpc_class *top_class = hpc_top_class_new(p);
-  hpc_scope *scope = scope_new(p, 0, 0, top_class, FALSE, FALSE);
+  hpc_scope *scope = scope_new(p, 0, 0, top_class, FALSE);
   HIR *main_body = typing(scope, ast);
 
   HIR *params = list2(
