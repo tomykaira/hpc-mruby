@@ -831,17 +831,14 @@ put_multiplexers(hpc_codegen_context *c, HIR *map)
     PUTS("\t\tgoto end;\n");
     PUTS("\t}\n\n");
 
-    PUTS("\tint code = *((int *)mrb_obj_ptr(__self__));\n");
+    /* fixnum => module */
+    PUTS("\tint code = mrb_fixnum_p(__self__) ? mrb_fixnum(__self__) : *((int *)mrb_obj_ptr(__self__));\n");
     while (classes) {
       HIR * klass = classes->car;
       HIR * name = klass->car;
       int sdefp = (intptr_t)klass->cdr;
 
-      if (sdefp) {
-        PUTS("\tif (mrb_fixnum(__self__) == "); put_class_code(c, sym(name));
-      } else {
-        PUTS("\tif (code == "); put_class_code(c, sym(name));
-      }
+      PUTS("\tif (code == "); put_class_code(c, sym(name));
       PUTS(") {\n\t\tresult = ");
       put_unique_function_name(c, name, method->car);
       PUTS("(__self__");
