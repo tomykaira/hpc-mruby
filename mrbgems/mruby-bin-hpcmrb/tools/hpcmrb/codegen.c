@@ -419,7 +419,7 @@ put_fundecl(hpc_codegen_context *c, hpc_class *class, HIR *decl)
   INDENT_PP;
   if (class && class->name && !decl->cdr->car) {
     PUTS_INDENT; put_class_type(c, class->name); PUTS(" *data;\n");
-    PUTS_INDENT; PUTS("Data_Get_Struct(mrb, __self__, &hpc_data_type, data);\n");
+    PUTS_INDENT; PUTS("*(void**)&data = DATA_PTR(__self__);\n");
   }
   put_statement(c, decl->cdr->cdr->cdr->cdr->cdr->car, TRUE);
   INDENT_MM;
