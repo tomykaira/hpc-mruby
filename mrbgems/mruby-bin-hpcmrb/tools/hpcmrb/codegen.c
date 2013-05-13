@@ -66,8 +66,20 @@ put_header(hpc_codegen_context *c)
   PUTS("#include \"mruby.h\"\n");
   PUTS("#include \"mruby/variable.h\"\n");
   PUTS("#include \"mruby/class.h\"\n");
+  PUTS("#include \"mruby/data.h\"\n");
   PUTS("#include \"builtin.h\"\n\n");
+
   PUTS("extern mrb_state * mrb;\n\n");
+
+  PUTS("static void\n");
+  PUTS("hpc_free(mrb_state *mrb, void *p)\n");
+  PUTS("{\n");
+  PUTS("\tmrb_free(mrb, p);\n");
+  PUTS("}\n");
+
+  PUTS("static const struct mrb_data_type hpc_data_type = {\n");
+  PUTS("\t\"hpcmrb_class\", hpc_free\n");
+  PUTS("};\n\n");
 }
 
 static void
@@ -359,10 +371,7 @@ put_ivar_name(hpc_codegen_context *c, HIR *hir)
 static void
 put_ivar(hpc_codegen_context *c, HIR *name)
 {
-  PUTS("((");
-  put_class_type(c, c->current_class->name);
-  PUTS(" *)(mrb_voidp(__self__)))->");
-  put_ivar_name(c, name);
+  PUTS("data->"); put_ivar_name(c, name);
 }
 
 static void
@@ -408,6 +417,10 @@ put_fundecl(hpc_codegen_context *c, hpc_class *class, HIR *decl)
   put_fundecl_decl(c, class, decl);
   PUTS("\n{\n");
   INDENT_PP;
+  if (class && class->name && !decl->cdr->car) {
+    PUTS_INDENT; put_class_type(c, class->name); PUTS(" *data;\n");
+    PUTS_INDENT; PUTS("Data_Get_Struct(mrb, __self__, &hpc_data_type, data);\n");
+  }
   put_statement(c, decl->cdr->cdr->cdr->cdr->cdr->car, TRUE);
   INDENT_MM;
   PUTS("}\n\n");
@@ -726,7 +739,9 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
         HIR *name = hirsym(((hpc_class*)stat->cdr)->name);
         PUTS_INDENT;
         put_var(c, name); PUTS(" = ");
-        PUTS("mrb_fixnum_value("); put_class_code(c, sym(name)); PUTS(");\n");
+        PUTS("mrb_obj_value(mrb_define_class(mrb, \"");
+        put_symbol(c, name);
+        PUTS("\", mrb->object_class));\n");
         PUTS_INDENT;
         put_symbol(c, name); PUTS("_init("); put_var(c, name); PUTS(");\n");
       }
@@ -823,34 +838,38 @@ put_multiplexers(hpc_codegen_context *c, HIR *map)
 
     PUTS("\tint ai;\n");
     PUTS("\tif (!val) ai = mrb_gc_arena_save(mrb);\n");
-    PUTS("\tmrb_value result;\n");
-    PUTS("\tif (! mrb_voidp(__self__)) {\n");
-    sprintf(buf, "\t\tresult = mrb_funcall(mrb, __self__, \"%s\", %d%s);\n",
-            mrb_sym2name(mrb, sym(method->car)), arg_count, arglist);
-    PUTS(buf);
-    PUTS("\t\tgoto end;\n");
-    PUTS("\t}\n\n");
 
-    /* fixnum => module */
-    PUTS("\tint code = mrb_fixnum_p(__self__) ? mrb_fixnum(__self__) : *((int *)mrb_obj_ptr(__self__));\n");
+    PUTS("\tmrb_value result;\n");
+    PUTS("\tstruct RClass *c = mrb_obj_ptr(__self__)->c;\n");
     while (classes) {
       HIR * klass = classes->car;
       HIR * name = klass->car;
       int sdefp = (intptr_t)klass->cdr;
 
-      PUTS("\tif (code == "); put_class_code(c, sym(name));
-      PUTS(") {\n\t\tresult = ");
+      if (sdefp) {
+        PUTS("\tif (mrb_eql(mrb, __self__, ");
+        put_symbol(c, name);
+        PUTS(")) {\n");
+      } else {
+        PUTS("\tif (c == (struct RClass *)mrb_obj_ptr(");
+        put_symbol(c, name);
+        PUTS(")) {\n");
+      }
+      PUTS("\t\tresult = ");
       put_unique_function_name(c, name, method->car);
       PUTS("(__self__");
       PUTS(arglist);
       PUTS(");\n\t}");
 
+      PUTS(" else ");
       next(classes);
-      if (classes)
-        PUTS(" else ");
     }
 
-    PUTS("\nend:\n");
+    PUTS("{\n");
+    sprintf(buf, "\t\tresult = mrb_funcall(mrb, __self__, \"%s\", %d%s);\n",
+            mrb_sym2name(mrb, sym(method->car)), arg_count, arglist);
+    PUTS(buf);
+    PUTS("\t}\n");
     PUTS("\tif (!val) mrb_gc_arena_restore(mrb,  ai);\n");
     PUTS("\treturn result;\n");
     PUTS("}\n\n");
@@ -961,22 +980,33 @@ put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
 
     put_map_decl(c, new_sym, arg_count);
     PUTS("\n{\n");
+    INDENT_PP;
 
-    PUTS("\tmrb_value obj;\n");
+    PUTS_INDENT; PUTS("mrb_value obj;\n");
+    PUTS_INDENT; PUTS("struct RData * data;\n");
+    PUTS_INDENT; PUTS("struct RClass *c = mrb_class_ptr(__self__);\n");
 
     while (classes) {
       mrb_sym name = sym(classes->car->car);
-      PUTS("\tif (mrb_fixnum(__self__) == "); put_class_code(c, name); PUTS(") {\n");
-      PUTS("\t\t"); put_class_type(c, name);
-      PUTS(" *data = mrb_malloc(mrb, sizeof("); put_class_type(c, name); PUTS("));\n");
-      PUTS("\t\tdata->type = "); put_class_code(c, name); PUTS(";\n");
-      PUTS("\t\tobj = mrb_voidp_value(data);\n");
-      PUTS("\t\t");
+      PUTS_INDENT; PUTS("if (c == mrb_class_get(mrb, \""); /* TODO: use mrb_obj_ptr */
+      put_symbol(c, hirsym(name));
+      PUTS("\")) {\n");
+      INDENT_PP;
+
+      PUTS_INDENT; put_class_type(c, name); PUTS(" *sval;\n");
+      PUTS_INDENT; PUTS("Data_Make_Struct(mrb, c, ");
+      put_class_type(c, name); PUTS(", ");
+      PUTS("&hpc_data_type, sval, data);\n");
+      PUTS_INDENT; PUTS("sval->type = "); put_class_code(c, name); PUTS(";\n");
+      PUTS_INDENT; PUTS("obj = mrb_obj_value(data);\n");
+      PUTS_INDENT;
       put_unique_function_name(c, hirsym(name), (HIR *)(intptr_t)c->mrb->init_sym);
       PUTS("(obj");
       PUTS(arglist);
-      PUTS(");\n\t} else ");
+      PUTS(");\n");
 
+      INDENT_MM;
+      PUTS("} else ");
       classes = classes->cdr;
     }
 
@@ -984,6 +1014,7 @@ put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
     PUTS("\t\tobj = mrb_instance_new(mrb, __self__);\n");
     PUTS("\t}\n");
     PUTS("\treturn obj;\n");
+    INDENT_MM;
     PUTS("}\n\n");
   }
 }
