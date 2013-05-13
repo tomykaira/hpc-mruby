@@ -959,13 +959,24 @@ lookup_map(HIR *map, mrb_sym sym, int arg_count)
   return NULL;
 }
 
+void
+put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
+{
+  int arg_count;
+  mrb_sym new_sym = mrb_intern(c->mrb, "new");
+
+  for (arg_count = 0; arg_count < max_arg; ++arg_count) {
+    put_map_decl(c, new_sym, arg_count); PUTS(";");
+  }
+}
+
 /*
   We do not know about built-in classes' initialize.
   We should define possible cases.
   cf. mrb_instance_new in class.c
 */
 void
-put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
+put_new_bodies(hpc_codegen_context *c, HIR *map, int max_arg)
 {
   int arg_count;
   mrb_sym new_sym = mrb_intern(c->mrb, "new");
@@ -988,9 +999,9 @@ put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
 
     while (classes) {
       mrb_sym name = sym(classes->car->car);
-      PUTS_INDENT; PUTS("if (c == mrb_class_get(mrb, \""); /* TODO: use mrb_obj_ptr */
+      PUTS_INDENT; PUTS("if (c == (struct RClass *)mrb_obj_ptr(");
       put_symbol(c, hirsym(name));
-      PUTS("\")) {\n");
+      PUTS(")) {\n");
       INDENT_PP;
 
       PUTS_INDENT; put_class_type(c, name); PUTS(" *sval;\n");
@@ -1191,6 +1202,7 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
     put_decl(&c, hir->car);
     hir = hir->cdr;
   }
+  put_new_bodies(&c, function_map, 4);
   put_class_inits(&c, s->classes);
   put_class_methods(&c, s->classes);
   put_multiplexers(&c, function_map);
