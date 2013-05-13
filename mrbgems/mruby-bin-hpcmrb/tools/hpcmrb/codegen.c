@@ -12,6 +12,7 @@
                   t == HIR_PVARDECL)
 
 #define sym(x) ((mrb_sym)(intptr_t)(x))
+#define hirsym(x) ((HIR*)(intptr_t)(x))
 
 #define PUTS(str) (fputs((str), c->wfp))
 #define PUTS_INDENT {                           \
@@ -323,10 +324,8 @@ put_unique_function_name(hpc_codegen_context *c, HIR* class_name, HIR* method_na
   if (class_name) {
     put_symbol(c, class_name);
     PUTS("_");
-    put_function_name(c, method_name);
-  } else {
-    put_function_name(c, method_name);
   }
+  put_function_name(c, method_name);
 }
 
 static void
@@ -354,14 +353,14 @@ put_cvar_name(hpc_codegen_context *c, HIR *hir)
 }
 
 static void
-put_fundecl_decl(hpc_codegen_context *c, HIR *decl)
+put_fundecl_decl(hpc_codegen_context *c, hpc_class *class, HIR *decl)
 {
-  HIR *funtype = CADR(decl);
-  HIR *params = CADDDR(decl);
+  HIR *funtype = CADDR(decl);
+  HIR *params = CADDDDR(decl);
   hpc_assert((intptr_t)funtype->car == HTYPE_FUNC);
   put_type(c, CADR(funtype));
   PUTS("\n");
-  put_unique_function_name(c, CADDR(decl)->car, CADDR(decl)->cdr);
+  put_unique_function_name(c, class ? hirsym(class->name) : 0, CADDDR(decl));
   PUTS("(");
   while (params) {
     hpc_assert((intptr_t)params->car->car == HIR_PVARDECL);
@@ -372,6 +371,17 @@ put_fundecl_decl(hpc_codegen_context *c, HIR *decl)
     }
   }
   PUTS(")");
+}
+
+static void
+put_fundecl(hpc_codegen_context *c, hpc_class *class, HIR *decl)
+{
+  put_fundecl_decl(c, class, decl);
+  PUTS("\n{\n");
+  INDENT_PP;
+  put_statement(c, decl->cdr->cdr->cdr->cdr->cdr->car, TRUE);
+  INDENT_MM;
+  PUTS("}\n\n");
 }
 
 static void
@@ -394,14 +404,7 @@ put_decl(hpc_codegen_context *c, HIR *decl)
       put_vardecl(c, decl->cdr);
       return;
     case HIR_FUNDECL:
-      {
-        put_fundecl_decl(c, decl);
-        PUTS("\n{\n");
-        INDENT_PP;
-        put_statement(c, CADDDDR(decl), TRUE);
-        INDENT_MM;
-        PUTS("}\n\n");
-      }
+      put_fundecl(c, NULL, decl);
       return;
     default:
       NOT_REACHABLE();
@@ -696,15 +699,18 @@ put_statement(hpc_codegen_context *c, HIR *stat, int no_brace)
       }
       return;
     case HIR_DEFCLASS:
-      /* mrb_value NAME = mrb_define_class(mrb, NAME, mrb->object_class) */
-      PUTS_INDENT;
-      put_var(c, CADR(stat));
-      PUTS(" = ");
-      PUTS("mrb_obj_value(mrb_define_class(mrb, \"");
-      put_symbol(c, CADR(stat));
-      PUTS("\", mrb->object_class));\n");
-      PUTS_INDENT;
-      put_symbol(c, CADR(stat)); PUTS("_init("); put_var(c, CADR(stat)); PUTS(");\n");
+      /* NAME = mrb_define_class(mrb, NAME, mrb->object_class);
+         NAME_init(NAME); */
+      {
+        HIR *name = hirsym(((hpc_class*)stat->cdr)->name);
+        PUTS_INDENT;
+        put_var(c, name); PUTS(" = ");
+        PUTS("mrb_obj_value(mrb_define_class(mrb, \"");
+        put_symbol(c, name);
+        PUTS("\", mrb->object_class));\n");
+        PUTS_INDENT;
+        put_symbol(c, name); PUTS("_init("); put_var(c, name); PUTS(");\n");
+      }
       return;
     case HIR_EMPTY:
       return;
@@ -763,9 +769,8 @@ put_map_decl(hpc_codegen_context *c, const mrb_sym name, const int arg_count)
   }
  */
 static void
-put_multiplexers(hpc_codegen_context *c, hpc_state *s)
+put_multiplexers(hpc_codegen_context *c, HIR *map)
 {
-  HIR * map = s->function_map;
   mrb_state *mrb = c->mrb;
 
   while (map) {
@@ -841,9 +846,10 @@ put_multiplexers(hpc_codegen_context *c, hpc_state *s)
 void
 put_fun_decls(hpc_codegen_context *c, HIR *hir, HIR *map)
 {
+  /* toplevel functions */
   while (hir) {
     if (TYPE(hir->car) == HIR_FUNDECL) {
-      put_fundecl_decl(c, hir->car);
+      put_fundecl_decl(c, NULL, hir->car);
       PUTS(";\n");
     }
     hir = hir->cdr;
@@ -979,35 +985,108 @@ put_new_decls(hpc_codegen_context *c, HIR *map, int max_arg)
 }
 
 void
-put_class_inits(hpc_codegen_context *c, HIR* class_inits)
+put_class_init_decls(hpc_codegen_context *c, HIR* classes)
 {
-  while (class_inits) {
-    HIR* name = class_inits->car->car;
-    HIR* body = class_inits->car->cdr;
-    PUTS("void\n");
-    put_symbol(c, name); PUTS("_init(mrb_value __self__)\n");
-    PUTS("{\n");
-    INDENT_PP;
-    put_statement(c, body, TRUE);
-    INDENT_MM;
-    PUTS("}\n\n");
-    class_inits = class_inits->cdr;
+  while (classes) {
+    mrb_sym name = ((hpc_class*)classes->car)->name;
+    if (name) {
+      PUTS("void "); put_symbol(c, hirsym(name)); PUTS("_init(mrb_value __self__);\n");
+    }
+    next(classes);
   }
 }
 
 void
-put_class_init_decls(hpc_codegen_context *c, HIR* class_inits)
+put_class_inits(hpc_codegen_context *c, HIR* classes)
 {
-  while (class_inits) {
-    PUTS("void "); put_symbol(c, class_inits->car->car); PUTS("_init(mrb_value __self__);\n");
-    class_inits = class_inits->cdr;
+  while (classes) {
+    hpc_class *class = (hpc_class *)classes->car;
+    if (class->name) {
+      PUTS("void\n");
+      put_symbol(c, hirsym(class->name)); PUTS("_init(mrb_value __self__)\n");
+      PUTS("{\n");
+      INDENT_PP;
+      put_statement(c, class->initializer, TRUE);
+      INDENT_MM;
+      PUTS("}\n\n");
+    }
+    next(classes);
   }
+}
+
+void
+put_class_method_decls(hpc_codegen_context *c, HIR *classes)
+{
+  while (classes) {
+    hpc_class *class = (hpc_class *)classes->car;
+    HIR *methods = class->methods;
+    while (methods) {
+      put_fundecl_decl(c, class, methods->car); PUTS(";\n");
+      next(methods);
+    }
+    next(classes);
+  }
+}
+
+void
+put_class_methods(hpc_codegen_context *c, HIR *classes)
+{
+  while (classes) {
+    hpc_class *class = (hpc_class *)classes->car;
+    HIR *methods = class->methods;
+    while (methods) {
+      put_fundecl(c, class, methods->car);
+      next(methods);
+    }
+    next(classes);
+  }
+}
+
+static HIR*
+insert_to_map(hpc_state *p, HIR *map_top, HIR *fundecl, hpc_class *class)
+{
+  HIR *map = map_top;
+  HIR *method_name = fundecl->cdr->cdr->cdr->car;
+  int sdefp = (intptr_t)fundecl->cdr->car;
+  int arg_count = length(fundecl->cdr->cdr->cdr->cdr->car)-1;
+  HIR *entry = cons(hirsym(class->name), (HIR*)sdefp);
+
+  while (map) {
+    if (map->car->car->car == method_name &&
+        (intptr_t)map->car->car->cdr == arg_count) {
+      push(map->car->cdr, entry);
+      return map_top;
+    }
+    next(map);
+  }
+  /* not found */
+  push(map_top, cons(cons(method_name, (HIR*)arg_count), list1(entry)));
+  return map_top;
+}
+
+static HIR*
+construct_function_map(hpc_state *p)
+{
+  HIR *map = 0;
+  HIR *classes = p->classes;
+
+  while (classes) {
+    HIR *methods = ((hpc_class*)classes->car)->methods;
+    while (methods) {
+      map = insert_to_map(p, map, methods->car, (hpc_class *)classes->car);
+      next(methods);
+    }
+    next(classes);
+  }
+
+  return map;
 }
 
 mrb_value
 hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
 {
   hpc_codegen_context c;
+  HIR *function_map;
 
   puts("Generating C-program...");
 
@@ -1015,18 +1094,21 @@ hpc_generate_code(hpc_state *s, FILE *wfp, HIR *hir, mrbc_context *__c)
   c.mrb = s->mrb;
   c.wfp = wfp;
 
+  function_map = construct_function_map(s);
+
   put_header(&c);
-  /* toplevel is a list of decls */
-  put_fun_decls(&c, hir, s->function_map);
+  put_fun_decls(&c, hir, function_map);
+  put_class_method_decls(&c, s->classes);
   put_intern_table(&c, s->intern_names);
-  put_new_decls(&c, s->function_map, 4);
-  put_class_init_decls(&c, s->class_inits);
+  put_new_decls(&c, function_map, 4);
+  put_class_init_decls(&c, s->classes);
   while (hir) {
     put_decl(&c, hir->car);
     hir = hir->cdr;
   }
-  put_class_inits(&c, s->class_inits);
-  put_multiplexers(&c, s);
+  put_class_inits(&c, s->classes);
+  put_class_methods(&c, s->classes);
+  put_multiplexers(&c, function_map);
 
   return mrb_fixnum_value(0);
 }
