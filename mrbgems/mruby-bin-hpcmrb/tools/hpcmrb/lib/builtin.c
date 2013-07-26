@@ -1,11 +1,21 @@
 #include "hpcmrb.h"
 #include "mruby.h"
 #include "mruby/value.h"
+#include "mruby/string.h"
+#include "mruby/array.h" /* mrb_ary_ref */
+#include <limits.h> /* CHAR_BIT macro */
+#include <string.h> /* memcpy */
+#include <math.h>
+#include <stdlib.h>
 
 #define TYPES2(a,b) ((((uint16_t)(a))<<8)|(((uint16_t)(b))&0xff))
 
+mrb_value hpc_str_plus(mrb_value, mrb_value);
+
+extern mrb_state *mrb; /* using mrb_state in the driver-main */
+
 mrb_value
-num_add(mrb_value a, mrb_value b)
+num_add_1(int val, mrb_value a, mrb_value b)
 {
   switch (TYPES2(mrb_type(a), mrb_type(b))) {
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FIXNUM):
@@ -26,13 +36,15 @@ num_add(mrb_value a, mrb_value b)
     return mrb_float_value(mrb_float(a) + (mrb_float)mrb_fixnum(b));
   case TYPES2(MRB_TT_FLOAT,MRB_TT_FLOAT):
     return mrb_float_value(mrb_float(a) + mrb_float(b));
+  case TYPES2(MRB_TT_STRING,MRB_TT_STRING):
+    return hpc_str_plus(a, b);
   default:
     NOT_REACHABLE();
   }
 }
 
 mrb_value
-num_addi(mrb_value a, mrb_int b)
+num_addi_1(int val, mrb_value a, mrb_int b)
 {
   switch (mrb_type(a)) {
   case MRB_TT_FIXNUM:
@@ -55,7 +67,7 @@ num_addi(mrb_value a, mrb_int b)
 }
 
 mrb_value
-num_sub(mrb_value a, mrb_value b)
+num_sub_1(int val, mrb_value a, mrb_value b)
 {
   switch (TYPES2(mrb_type(a), mrb_type(b))) {
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FIXNUM):
@@ -82,7 +94,7 @@ num_sub(mrb_value a, mrb_value b)
 }
 
 mrb_value
-num_subi(mrb_value a, mrb_int b)
+num_subi_1(int val, mrb_value a, mrb_int b)
 {
   switch (mrb_type(a)) {
   case MRB_TT_FIXNUM:
@@ -105,7 +117,7 @@ num_subi(mrb_value a, mrb_int b)
 }
 
 mrb_value
-num_mul(mrb_value a, mrb_value b)
+num_mul_1(int val, mrb_value a, mrb_value b)
 {
   switch (TYPES2(mrb_type(a), mrb_type(b))) {
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FIXNUM):
@@ -132,7 +144,7 @@ num_mul(mrb_value a, mrb_value b)
 }
 
 mrb_value
-num_div(mrb_value a, mrb_value b)
+num_div_1(int val, mrb_value a, mrb_value b)
 {
   switch (TYPES2(mrb_type(a), mrb_type(b))) {
   case TYPES2(MRB_TT_FIXNUM,MRB_TT_FIXNUM):
@@ -151,6 +163,42 @@ num_div(mrb_value a, mrb_value b)
   default:
     NOT_REACHABLE();
   }
+}
+
+#define BINOP(op)                               \
+  mrb_int x, y;                                 \
+  x = mrb_fixnum(a);                            \
+  y = mrb_fixnum(b);                            \
+  return mrb_fixnum_value(x op y);              \
+
+mrb_value
+num_xor_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(^)
+}
+
+mrb_value
+num_lshift_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(<<)
+}
+
+mrb_value
+num_rshift_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(>>)
+}
+
+mrb_value
+num_and_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(&)
+}
+
+mrb_value
+num_mod_1(int val, mrb_value a, mrb_value b)
+{
+  BINOP(%)
 }
 
 #define OP_CMP_BODY(op,v1,v2) do {\
@@ -179,10 +227,11 @@ num_div(mrb_value a, mrb_value b)
 } while (0)
 
 mrb_value
-num_eq(mrb_value a, mrb_value b)
+num_eq_1(int val, mrb_value a, mrb_value b)
 {
-  if(mrb_obj_eq(NULL, a, b)) {
-    return mrb_true_value();
+  if (mrb_type(a) != MRB_TT_FIXNUM
+      && mrb_type(a) != MRB_TT_FLOAT) {
+    return mrb_bool_value(mrb_obj_eq(mrb, a, b));
   }
   else {
     OP_CMP(==);
@@ -190,25 +239,230 @@ num_eq(mrb_value a, mrb_value b)
 }
 
 mrb_value
-num_lt(mrb_value a, mrb_value b)
+num_lt_1(int val, mrb_value a, mrb_value b)
 {
   OP_CMP(<);
 }
 
 mrb_value
-num_le(mrb_value a, mrb_value b)
+num_le_1(int val, mrb_value a, mrb_value b)
 {
   OP_CMP(<=);
 }
 
 mrb_value
-num_gt(mrb_value a, mrb_value b)
+num_gt_1(int val, mrb_value a, mrb_value b)
 {
   OP_CMP(>);
 }
 
 mrb_value
-num_ge(mrb_value a, mrb_value b)
+num_ge_1(int val, mrb_value a, mrb_value b)
 {
   OP_CMP(>=);
+}
+
+
+/* almost copied from string.c(mrb_str_plus) */
+mrb_value
+hpc_str_plus(mrb_value a, mrb_value b)
+{
+  struct RString *s = mrb_str_ptr(a);
+  struct RString *s2 = mrb_str_ptr(b);
+
+
+  mrb_value v = mrb_str_new(mrb, 0, s->len + s2->len);
+  struct RString *t = mrb_str_ptr(v);
+
+  memcpy(t->ptr, s->ptr, s->len);
+  memcpy(t->ptr + s->len, s2->ptr, s2->len);
+
+  return v;
+}
+
+/* almost copied from numeric.c(mrb_fixnum_to_str) */
+mrb_value
+hpc_fixnum_to_str(int val, mrb_value x, int base)
+{
+  char buf[sizeof(mrb_int)*CHAR_BIT+1];
+  char *b = buf + sizeof buf;
+  mrb_int v = mrb_fixnum(x);
+
+  if (base < 2 || 36 < base) {
+    mrb_raisef(mrb, E_ARGUMENT_ERROR, "invid radix %S", mrb_fixnum_value(base));
+  }
+
+  if (v == 0) {
+    *--b = '0';
+  } else if (v < 0) {
+    do {
+      *--b = mrb_digitmap[-(v % base)];
+    } while (v /= base);
+    *--b = '-';
+  } else {
+    do {
+      *--b = mrb_digitmap[(int)(v % base)];
+    } while (v /= base);
+  }
+
+  return mrb_str_new(mrb, b, buf + sizeof(buf) - b);
+}
+
+/* value n's type is expected to be <string> or <fixnum> */
+mrb_value
+puts_1(int val, mrb_value __self__, mrb_value n)
+{
+  mrb_value str = mrb_funcall(mrb, n, "to_s", 0);
+  const char *cstr = mrb_str_to_cstr(mrb, str);
+  puts(cstr);
+  return mrb_nil_value();
+}
+
+
+extern FILE *debug_fp;
+mrb_value
+print_1(int val, mrb_value __self__, mrb_value n)
+{
+  if (!mrb_string_p(n))
+    n = mrb_funcall(mrb, n, "to_s", 0);
+  const char *cstr = RSTRING_PTR(n);
+  size_t i, len = RSTRING_LEN(n);
+  for (i = 0; i < len; ++i) {
+    if (debug_fp) {
+      putc(cstr[i], debug_fp);
+      fflush(debug_fp);
+    } else {
+      putchar(cstr[i]);
+    }
+  }
+  return mrb_nil_value();
+}
+
+mrb_value
+bob_not_0(int val, mrb_value __self__)
+{
+  return mrb_bool_value(!mrb_test(__self__));
+}
+
+mrb_value
+hpc_ary_aget_1(int val, mrb_value __self__, mrb_value index)
+{
+  if(mrb_type(index) == MRB_TT_FIXNUM){
+    return mrb_ary_ref(mrb, __self__, mrb_fixnum(index));
+  }
+  puts("TYPE_ERROR: expected Fixnum for 1st argument (hpc_ary_aget)");
+  return mrb_nil_value();
+}
+
+mrb_value
+hpc_ary_aset_2(int val, mrb_value __self__, mrb_value index, mrb_value value)
+{
+  int ai;
+  if (!val)
+    ai = mrb_gc_arena_save(mrb);
+  if(mrb_type(index) == MRB_TT_FIXNUM){
+    mrb_ary_set(mrb, __self__, mrb_fixnum(index), value);
+    goto end;
+  }
+  puts("TYPE_ERROR: expected Fixnum for 1st argument (hpc_ary_aset)");
+  value = mrb_nil_value();
+
+ end:
+  if (!val)
+    mrb_gc_arena_restore(mrb, ai);
+  return value;
+}
+
+#define EVAL_FLOAT(num, exp) do {               \
+  mrb_float f;                                  \
+  switch (mrb_type(num)) {                      \
+  case MRB_TT_FIXNUM:                           \
+    f = (mrb_float)mrb_fixnum(num);             \
+    break;                                      \
+  case MRB_TT_FLOAT:                            \
+    f = mrb_float(num);                         \
+    break;                                      \
+  default:                                      \
+    puts("TypeError: can't be coerced into Float"); \
+    return mrb_float_value(nan(""));            \
+  }                                             \
+  return mrb_float_value(exp);                  \
+} while (1)
+
+mrb_value
+sqrt_1(int val, mrb_value __self__, mrb_value num)
+{
+  EVAL_FLOAT(num, sqrt(f));
+}
+
+mrb_value
+cos_1(int val, mrb_value __self__, mrb_value num)
+{
+  EVAL_FLOAT(num, cos(f));
+}
+
+mrb_value
+sin_1(int val, mrb_value __self__, mrb_value num)
+{
+  EVAL_FLOAT(num, sin(f));
+}
+
+mrb_value
+num_uminus_0(int val, mrb_value num)
+{
+  switch (mrb_type(num)) {
+  case MRB_TT_FIXNUM:
+    return mrb_fixnum_value(0 - mrb_fixnum(num));
+  case MRB_TT_FLOAT:
+    return mrb_float_value(0 - mrb_float(num));
+  default:
+    return mrb_funcall(mrb, num, "-@", 0);
+  }
+}
+
+mrb_value
+to_i_0(int val, mrb_value num)
+{
+  switch (mrb_type(num)) {
+  case MRB_TT_FIXNUM:
+    return num;
+  case MRB_TT_FLOAT:
+    return mrb_fixnum_value((mrb_int)mrb_float(num));
+  default:
+    return mrb_funcall(mrb, num, "to_i", 0);
+  }
+}
+
+mrb_value
+to_f_0(int val, mrb_value num)
+{
+  switch (mrb_type(num)) {
+  case MRB_TT_FIXNUM:
+    return mrb_float_value((mrb_float)mrb_fixnum(num));
+  case MRB_TT_FLOAT:
+    return num;
+  default:
+    return mrb_funcall(mrb, num, "to_i", 0);
+  }
+}
+
+mrb_value
+chr_0(int val, mrb_value num)
+{
+  switch (mrb_type(num)) {
+  case MRB_TT_FIXNUM:
+    {
+      char c;
+      c = (char)mrb_fixnum(num);
+      return mrb_str_new(mrb, &c, 1);
+    }
+  default:
+    return mrb_funcall(mrb, num, "chr", 0);
+  }
+}
+
+mrb_value
+to_s_0(int val, mrb_value __self__)
+{
+  return mrb_funcall(mrb, __self__, "to_s", 0);
 }

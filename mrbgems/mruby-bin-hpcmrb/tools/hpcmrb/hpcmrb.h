@@ -21,7 +21,7 @@ enum hir_type {
   HIR_GVARDECL,   /* (:HIR_GVARDECL type var value) */
   HIR_LVARDECL,   /* (:HIR_LVARDECL type var value) */
   HIR_PVARDECL,   /* (:HIR_PVARDECL type var) */
-  HIR_FUNDECL,    /* (:HIR_FUNDECL type sym (params...) body (options...)) */
+  HIR_FUNDECL,    /* (:HIR_FUNDECL sdefp type sym (params...) body) */
 
   HIR_INIT_LIST,  /* (:HIR_INIT_LIST values...) */
 
@@ -35,6 +35,7 @@ enum hir_type {
   HIR_BREAK,      /* (:HIR_BREAK) */
   HIR_CONTINUE,   /* (:HIR_CONTINUE) */
   HIR_RETURN,     /* (:HIR_RETURN) or (:HIR_RETURN exp) */
+  HIR_DEFCLASS,   /* (:HIR_DEFCLASS . hpc_class) super is not supported */
 
   /* expressions */
   HIR_EMPTY,      /* (:HIR_EMPTY) */
@@ -44,6 +45,8 @@ enum hir_type {
   HIR_STRING,     /* (:HIR_STRING text length) */
   HIR_LVAR,       /* (:HIR_LVAR . symbol) */
   HIR_GVAR,       /* (:HIR_GVAR . symbol) */
+  HIR_IVAR,       /* (:HIR_IVAR . symbol) */
+  HIR_CVAR,       /* (:HIR_CVAR . symbol) */
   HIR_CALL,       /* (:HIR_CALL func args...) */
   HIR_COND_OP,    /* (:HIR_COND_OP cond t f) t and f are exp */
 };
@@ -87,12 +90,23 @@ typedef struct HIR {
 typedef struct hpc_state {
   mrb_state *mrb;
   struct mrb_pool *pool;
-  HIR *decls;
   HIR *cells;
   HIR *gvars;                   /* found global variables */
+  HIR *classes;                 /* list hpc_class */
+  HIR *intern_names;            /* name table to declare statically */
+  int temp_counter;             /* temp name counter */
   short line;
   jmp_buf jmp;
 } hpc_state;
+
+typedef struct hpc_class {
+  hpc_state *hpc;
+  mrb_sym name;                 /* 0 if the (pseudo) class is top */
+  HIR *initializer;             /* initializer_statement */
+  HIR *ivs;                     /* list symbol */
+  HIR *cvs;                     /* list symbol */
+  HIR *methods;                 /* list HIR_method_def */
+} hpc_class;
 
 void init_hpc_compiler(hpc_state *p);
 void init_prim_interpreters(hpc_state *p);
@@ -100,6 +114,19 @@ struct RProc *get_interp(struct RProc *p);
 hpc_state* hpc_state_new(mrb_state *mrb);
 HIR *hpc_compile_file(hpc_state*, FILE*, mrbc_context*);
 mrb_value hpc_generate_code(hpc_state*, FILE*, HIR*, mrbc_context*);
+
+HIR* cons_gen(hpc_state *p, HIR *car, HIR *cdr);
+#define cons(a,b) cons_gen(p, (a), (b))
+#define list1(a)          cons((a), 0)
+#define list2(a,b)        cons((a), cons((b), 0))
+#define list3(a,b,c)      cons((a), cons((b), cons((c), 0)))
+#define list4(a,b,c,d)    cons((a), cons((b), cons((c), cons((d), 0))))
+#define list5(a,b,c,d,e)  cons((a), cons((b), cons((c), cons((d), cons((e), 0)))))
+#define list6(a,b,c,d,e,f)cons((a), cons((b), cons((c), cons((d), cons((e), cons((f), 0))))))
+
+#define unshift(x, y) (x = append(p, (x), list1(y)))
+#define push(x, y) (x = cons(y, x))
+#define next(x) (x = x->cdr)
 
 #if defined(__cplusplus)
 }  /* extern "C" { */

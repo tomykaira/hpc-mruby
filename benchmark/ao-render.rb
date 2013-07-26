@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # AO render benchmark
 # Original program (C) Syoyo Fujita in Javascript (and other languages)
 #      http://lucille.atso-net.jp/blog/?p=642
@@ -24,8 +25,8 @@ module Rand
     t = x ^ ((x & 0xfffff) << 11)
     w = @@w
     @@x, @@y, @@z = @@y, @@z, w
-    w = @@w = (w ^ (w >> 19) ^ (t ^ (t >> 8)))
-    (w % BNUM) / BNUMF
+    @@w = (w ^ (w >> 19) ^ (t ^ (t >> 8)))
+    (@@w % BNUM) / BNUMF
   end
 end
 
@@ -244,8 +245,6 @@ class Scene
         @plane.intersect(ray, occisect)
         if occisect.hit then
           occlusion = occlusion + 1.0
-        else
-          0.0
         end
       end
     end
@@ -257,11 +256,11 @@ class Scene
   def render(w, h, nsubsamples)
     cnt = 0
     nsf = nsubsamples.to_f
-    h.times do |y|
+    h.times do |y| # width * heightの点についてループを回す
       w.times do |x|
-        rad = Vec.new(0.0, 0.0, 0.0)
+        rad = Vec.new(0.0, 0.0, 0.0) # RGBを(0,0,0)に初期化
 
-        # Subsmpling
+        # Subsmpling # 2*2回だけ衝突判定を試す(最終的にはそれらの平均をとる)
         nsubsamples.times do |v|
           nsubsamples.times do |u|
             cnt = cnt + 1
@@ -289,8 +288,6 @@ class Scene
               rad.x = rad.x + col.x
               rad.y = rad.y + col.y
               rad.z = rad.z + col.z
-            else
-              0.0
             end
           end
         end
@@ -298,18 +295,18 @@ class Scene
         r = rad.x / (nsf * nsf)
         g = rad.y / (nsf * nsf)
         b = rad.z / (nsf * nsf)
-        printf("%c", clamp(r))
-        printf("%c", clamp(g))
-        printf("%c", clamp(b))
+        print clamp(r).chr
+        print clamp(g).chr
+        print clamp(b).chr
       end
     end
   end
 end
 
 # File.open("ao.ppm", "w") do |fp|
-  printf("P6\n")
-  printf("%d %d\n", IMAGE_WIDTH, IMAGE_HEIGHT)
-  printf("255\n", IMAGE_WIDTH, IMAGE_HEIGHT)
+  print "P6\n"
+  print IMAGE_WIDTH.to_s + " " + IMAGE_HEIGHT.to_s + "\n"
+  print "255\n"
   Scene.new.render(IMAGE_WIDTH, IMAGE_HEIGHT, NSUBSAMPLES)
 #  Scene.new.render(256, 256, 2)
 # end

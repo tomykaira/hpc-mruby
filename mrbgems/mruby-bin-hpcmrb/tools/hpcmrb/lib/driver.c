@@ -9,32 +9,24 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern int compiled_main(mrb_state *mrb);
+extern void compiled_main(mrb_value, mrb_state *);
+extern void init_global_syms(mrb_state *);
 
+mrb_state *mrb;
+
+FILE *debug_fp = NULL;
 int
 main(int argc, char **argv)
 {
-  mrb_state *mrb = mrb_open();
-  int n = -1;
-  int i;
-  mrb_value ARGV;
+  mrb = mrb_open();
+  debug_fp = fopen("result.ppm", "w");
 
-  if (mrb == NULL) {
-    fputs("Invalid mrb_state, exiting mruby\n", stderr);
-    return EXIT_FAILURE;
-  }
+  init_global_syms(mrb);
+  compiled_main(mrb_top_self(mrb), mrb);
 
-  argc--;
-  argv++;
+  fclose(debug_fp);
+  mrb_close(mrb);
 
-  ARGV = mrb_ary_new_capa(mrb, argc);
-  for (i = 0; i < argc; i++) {
-    mrb_ary_push(mrb, ARGV, mrb_str_new(mrb, argv[i], strlen(argv[i])));
-  }
-  mrb_define_global_const(mrb, "ARGV", ARGV);
-  /* mrb_gv_set(mrb, mrb_intern2(mrb, "$0", 2), ...) */
-
-  n = compiled_main(mrb);
-
-  return n == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+  return 0;
+  /* return n == 0 ? EXIT_SUCCESS : EXIT_FAILURE; */
 }
